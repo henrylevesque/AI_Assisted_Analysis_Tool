@@ -1,4 +1,4 @@
-# AI Analysis Tool
+# AI Assited Analysis Tool
 
 This project is an open-source, locally run AI assisted analysis tool powered by Ollama. The tool is designed to run AI-assisted analysis on an entire bibliography exported from Zotero. Users who want to use this tool should have Zotero installed and export a collection they want to perform the AI analysis on.
 
