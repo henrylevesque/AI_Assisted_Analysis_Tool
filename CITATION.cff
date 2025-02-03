@@ -4,8 +4,8 @@ authors:
 - family-names: "Levesque"
   given-names: "Henry"
   orcid: "https://orcid.org/0009-0008-5636-1143"
-title: "AI_Analysis_Tool"
+title: "AI_Assisted_Analysis_Tool"
 version: 1.0.0
-doi: 10.5281/zenodo.1234
+doi: 10.5281/zenodo.14796314
 date-released: 2025-01-31
 url: "https://github.com/hleve/AI_Analysis_Tool"
