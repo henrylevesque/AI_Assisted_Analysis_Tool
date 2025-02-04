@@ -8,7 +8,7 @@ import os
 initial_user_content = 'I am going to give you the text of an abstract. Please tell me what planning theory was used in the abstract. Do not tell me anything else. If you tell me anything besides the urban planning theory used in the abstract you will not be helpful. If no urban planning theory was used say none. The abstract text is:'
 
 # Read the content from a specific cell in a CSV or Excel file
-data_input_folder = 'C:/Users/leves/Documents/GitHub/AI_Analysis_Tool/Data_Input'
+data_input_folder = 'C:/Users/leves/Documents/GitHub/AI_Asisted_Analysis/Data_Input'
 file_name = next((f for f in os.listdir(data_input_folder) if f.endswith('.csv') or f.endswith('.xlsx')), None)
 if file_name:
     file_path = os.path.join(data_input_folder, file_name)
