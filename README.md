@@ -25,6 +25,9 @@ I am going to give you the text of an abstract. Please identify the methods used
 ### Identify Results
 I am going to give you the text of an abstract. Please identify the results from the abstract. Do not tell me anything else. If you tell me anything besides the results used in the abstract you will not be helpful. The abstract text is:
 
+### Identify Location
+I am going to give you the text of an abstract. Please tell me what where the research was conducted. Do not tell me anything else. If you tell me anything besides where the research was conducted you will not be helpful. If no location is mentioned, say none. The abstract text is:
+
 ## How to Use
 
 1. **Export from Zotero**: Export the collection you want to analyze from Zotero as a CSV or Excel file.
