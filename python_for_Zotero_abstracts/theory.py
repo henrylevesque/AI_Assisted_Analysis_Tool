@@ -22,8 +22,8 @@ author_col = 3  # Column index for author name(s) (0-based)
 publication_date_col = 2  # Column index for publication date (0-based)
 
 # Output file path
-output_file_name = os.path.splitext(file_name)[0] + '_ai_responses.xlsx'
-output_file_path = os.path.join('C:/Users/leves/Documents/GitHub/AI_Analysis_Tool/Data_Output', output_file_name)
+output_file_name = os.path.splitext(file_name)[0] + '_theory_ai_responses.xlsx'
+output_file_path = os.path.join('C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Output', output_file_name)
 
 # Number of times to run the loop
 num_runs = 5
