@@ -5,7 +5,7 @@ from ollama import ChatResponse
 import os
 
 # Define the initial content as a variable
-initial_user_content = 'I am going to give you the text of an abstract. Please tell me what where the research was conducted. Do not tell me anything else. If you tell me anything besides where the research was conducted you will not be helpful. If no urban planning theory was used say none. The abstract text is:'
+initial_user_content = 'I am going to give you the text of an abstract. Please tell me what where the research was conducted. Do not tell me anything else. If you tell me anything besides where the research was conducted you will not be helpful. If no location is mentioned, say none. The abstract text is:'
 
 # Read the content from a specific cell in a CSV or Excel file
 data_input_folder = 'C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Input'
