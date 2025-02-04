@@ -5,7 +5,7 @@ from ollama import ChatResponse
 import os
 
 # Define the initial content as a variable
-initial_user_content = 'I am going to give you the text of an abstract. Please identify three themes from the abstract. Do not tell me anything else. If you tell me anything besides the three themes used in the abstract you will not be helpful. The abstract text is:'
+initial_user_content = 'I am going to give you the text of an abstract. Please tell me what where the research was conducted. Do not tell me anything else. If you tell me anything besides where the research was conducted you will not be helpful. If no urban planning theory was used say none. The abstract text is:'
 
 # Read the content from a specific cell in a CSV or Excel file
 data_input_folder = 'C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Input'
@@ -22,7 +22,7 @@ author_col = 3  # Column index for author name(s) (0-based)
 publication_date_col = 2  # Column index for publication date (0-based)
 
 # Output file path
-output_file_name = os.path.splitext(file_name)[0] + 'n_themes_ai_responses.xlsx'
+output_file_name = os.path.splitext(file_name)[0] + '_location_ai_responses.xlsx'
 output_file_path = os.path.join('C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Output', output_file_name)
 
 # Number of times to run the loop
