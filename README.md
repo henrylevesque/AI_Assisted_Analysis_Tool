@@ -3,7 +3,7 @@
 This project is an open-source, locally run AI assisted analysis tool powered by Ollama. The tool is designed to run AI-assisted analysis on an entire bibliography exported from Zotero. Users who want to use this tool should have Zotero installed and export a collection they want to perform the AI analysis on.
 
 This tool is based on [Ollama](https://github.com/ollama/ollama-python) and is structured to work with bibliographic data exported from [Zotero](https://www.zotero.org/) in order to querry abstracts.
-This code can also be used to querry other types of data in .csv or .xls format.
+This code can also be used to querry other types of data in .csv or .xls format using the custom_analysis.py file.
 
 ## Key Features
 - Designed to work with Zotero exports (CSV/Excel).
@@ -28,8 +28,9 @@ I am going to give you the text of an abstract. Please identify the results from
 ## How to Use
 
 1. **Export from Zotero**: Export the collection you want to analyze from Zotero as a CSV or Excel file.
-2. **Run the Tool**: Use the provided code to run the AI analysis on the exported file.
+2. **Run the python files**: Use the provided python code to run a specific AI analysis on the exported file (eg. methods, results, location).
 3. **Analyze Results**: The tool will process each item in the bibliography, using Ollama to extract specific data from the bibliographic items. The code uses replication to account for any potential errors, employing a consensus-based approach to pull data from the bibliographic items.
+4. **Aggregate AI Results for Consensus**: Run the ai_response_aggregation.py file to aggregate the ai responses and get the result of the consensus and a rating for how strong the consensus is. 
 
 ## Flow Diagram
 
