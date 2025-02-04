@@ -19,6 +19,12 @@ I am going to give you the text of an abstract. Please tell me what planning the
 ### Identify Themes
 I am going to give you the text of an abstract. Please identify three themes from the abstract. Do not tell me anything else. If you tell me anything besides the three themes from the abstract you will not be helpful. The abstract text is:
 
+### Identify Methods
+I am going to give you the text of an abstract. Please identify the methods used in the abstract. Do not tell me anything else. If you tell me anything besides the methods used in the abstract you will not be helpful. The abstract text is:
+
+### Identify Results
+I am going to give you the text of an abstract. Please identify the results from the abstract. Do not tell me anything else. If you tell me anything besides the results used in the abstract you will not be helpful. The abstract text is:
+
 ## How to Use
 
 1. **Export from Zotero**: Export the collection you want to analyze from Zotero as a CSV or Excel file.
