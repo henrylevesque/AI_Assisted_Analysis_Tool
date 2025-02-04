@@ -19,7 +19,7 @@ def main():
     prompt = f'I am going to give you a chunk of text. Please identify {type_of_analysis} used in the text. Do not tell me anything else. If you tell me anything besides {type_of_analysis} used in the text you will not be helpful. The text is:'
 
     # Set up input/output paths
-    data_input_folder = 'C:/Users/leves/Documents/GitHub/AI_Analysis_Tool/Data_Input'
+    data_input_folder = 'C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Input'
     file_name = next((f for f in os.listdir(data_input_folder) if f.endswith('.csv') or f.endswith('.xlsx')), None)
     
     if not file_name:
@@ -27,7 +27,7 @@ def main():
         
     file_path = os.path.join(data_input_folder, file_name)
     output_file_name = os.path.splitext(file_name)[0] + '_custom_analysis.xlsx'
-    output_file_path = os.path.join('C:/Users/leves/Documents/GitHub/AI_Analysis_Tool/Data_Output', output_file_name)
+    output_file_path = os.path.join('C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Output', output_file_name)
 
     # Get user input for columns and runs
     id_col, content_col, num_runs = get_user_columns()
