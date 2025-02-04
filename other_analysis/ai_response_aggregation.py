@@ -6,11 +6,11 @@ from collections import Counter
 
 def main():
     # Read all Excel files from Data_Output folder
-    input_folder = "Data_Output"
+    input_folder = "Data_Input"
     excel_files = [os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith('.xlsx')]
 
     if not excel_files:
-        print("No Excel files found in the Data_Output folder.")
+        print("No Excel files found in the Data_Input folder.")
         return
 
     all_dfs = []
