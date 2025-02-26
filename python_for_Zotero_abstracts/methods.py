@@ -8,7 +8,7 @@ import os
 initial_user_content = 'I am going to give you the text of an abstract. Please identify the methods used in the abstract. Do not tell me anything else. If you tell me anything besides the methods used in the abstract you will not be helpful. The abstract text is:'
 
 # Read the content from a specific cell in a CSV or Excel file
-data_input_folder = 'C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Input'
+data_input_folder = os.path.join(os.path.dirname(__file__), '..', 'Data_Input')
 file_name = next((f for f in os.listdir(data_input_folder) if f.endswith('.csv') or f.endswith('.xlsx')), None)
 if file_name:
     file_path = os.path.join(data_input_folder, file_name)
@@ -23,7 +23,7 @@ publication_date_col = 2  # Column index for publication date (0-based)
 
 # Output file path
 output_file_name = os.path.splitext(file_name)[0] + '_methods_ai_responses.xlsx'
-output_file_path = os.path.join('C:/Users/leves/Documents/GitHub/AI_Assisted_Analysis/Data_Output', output_file_name)
+output_file_path = os.path.join(os.path.dirname(__file__), '..', 'Data_Output', output_file_name)
 
 # Number of times to run the loop
 num_runs = 5
