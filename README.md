@@ -1,6 +1,6 @@
 # AI Assisted Analysis Tool
 
-This project is an open-source, locally run AI-assisted analysis tool powered by Ollama. The tool is designed to run AI-assisted analysis on an entire bibliography exported from Zotero. Users who want to use this tool should have Zotero installed and export a collection they want to perform the AI analysis on as a .csv file.
+This project is an open-source, locally run AI-assisted text analysis tool powered by Ollama. The tool is currently set up to to run AI-assisted analysis on an entire bibliography exported from Zotero. Users who want to use this tool should have Zotero installed and export a collection they want to perform the AI analysis on as a .csv file.
 
 This tool is based on [Ollama](https://github.com/ollama/ollama-python) and is structured to work with bibliographic data exported from [Zotero](https://www.zotero.org/) to query abstracts. This code can also be used to query other types of data in .csv or .xls format using the `custom_analysis.py` file.
 
