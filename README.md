@@ -10,6 +10,10 @@ This tool is based on [Ollama](https://github.com/ollama/ollama-python) and is s
 - Maintains local control of data to ensure compliance with data-handling requirements.
 - Provides an open-source, reproducible method for analysis.
 
+## Requirements
+- Requires Ollama [Ollama Windows Download](https://ollama.com/download/windows) [Ollama Mac Download](https://ollama.com/download/mac) [Ollama Linux Download](https://ollama.com/download/linux).
+- Requires you to download or "pull" a model from Ollama to run the analysis. The examples code here all use Gemma2.
+
 ## Prompts
 
 ### Identify Urban Planning Theory
