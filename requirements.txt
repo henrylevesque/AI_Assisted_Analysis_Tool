@@ -1,1 +1,3 @@
-ollama
+ollama_python
+tqdm
+pandas
