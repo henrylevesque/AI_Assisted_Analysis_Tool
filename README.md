@@ -11,10 +11,16 @@ This tool is based on [Ollama](https://github.com/ollama/ollama-python) and is s
 - Provides an open-source, reproducible method for analysis.
 
 ## Requirements
-- Requires Ollama
+- **Python 3.7+** with virtual environment support
+- **Ollama** - AI model runtime
   - [Ollama for Windows](https://ollama.com/download/windows)
   - [Ollama for Mac](https://ollama.com/download/mac)
   - [Ollama for Linux](https://ollama.com/download/linux)
+- **Python Packages** (automatically installed via requirements.txt):
+  - `ollama` - Python client for Ollama
+  - `pandas` - Data manipulation and analysis
+  - `tqdm` - Progress bars
+  - `openpyxl` - Excel file handling
 - Requires you to download or "pull" a model from Ollama to run the analysis. The examples code here all use Gemma2:9b.
 
 ## Prompts
@@ -39,7 +45,7 @@ Provide the text of an abstract. The tool will identify where the research was c
 1. **Export from Zotero**: Export the collection you want to analyze from Zotero as a CSV or Excel file.
 2. **Run the Python files**: Use the provided Python code to run a specific AI analysis on the exported file (e.g., methods, results, location).
 3. **Analyze Results**: The tool will process each item in the bibliography, using Ollama to extract specific data from the bibliographic items. The code uses replication to account for any potential errors, employing a consensus-based approach to pull data from the bibliographic items.
-4. **Aggregate AI Results for Consensus**: Run the `ai_response_aggregation.py` file to aggregate the AI responses and get the result of the consensus and a rating for how strong the consensus is.
+4. **Aggregate AI Results for Consensus**: Run the `ai_response_aggregation.py` file to aggregate the AI responses and get the result of the consensus and a rating for how strong the consensus is. This can also be used to highlight which responses have a low confidence and may require manual review.
 
 ## Flow Diagram
 
@@ -94,9 +100,35 @@ graph LR
     ```
 
 5. **Install Chosen LLM**:
-    ```sh
-    ollama pull gemma2
+    ```sh    ollama pull gemma2
     ```
+
+## Troubleshooting
+
+### Import Errors
+If you encounter import errors for `ollama`, `pandas`, or `tqdm`, ensure that:
+
+1. **Virtual environment is activated**: Make sure you've activated your virtual environment before installing packages or running scripts.
+2. **Correct package installation**: Run `pip install -r requirements.txt` in your activated virtual environment.
+3. **VS Code Python interpreter**: If using VS Code, ensure it's using the Python interpreter from your virtual environment:
+   - Open Command Palette (Ctrl+Shift+P)
+   - Type "Python: Select Interpreter"
+   - Choose the interpreter from your `venv` folder
+
+### Common Package Issues
+- **ollama package**: The correct package name is `ollama`, not `ollama_python`
+- **Excel support**: `openpyxl` is required for writing Excel files with pandas
+- **Progress bars**: `tqdm` provides the progress bars shown during analysis
+
+### Virtual Environment Issues on Windows
+If you encounter PowerShell execution policy errors when activating the virtual environment:
+```powershell
+# Use the batch file instead
+.\venv\Scripts\activate.bat
+
+# Or bypass execution policy temporarily
+powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
+```
 
 ## Cloning the Repository
 
