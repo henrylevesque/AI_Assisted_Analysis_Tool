@@ -15,7 +15,7 @@ This tool is based on [Ollama](https://github.com/ollama/ollama-python) and is s
   - [Ollama for Windows](https://ollama.com/download/windows)
   - [Ollama for Mac](https://ollama.com/download/mac)
   - [Ollama for Linux](https://ollama.com/download/linux)
-- Requires you to download or "pull" a model from Ollama to run the analysis. The examples code here all use Gemma2.
+- Requires you to download or "pull" a model from Ollama to run the analysis. The examples code here all use Gemma2:9b.
 
 ## Prompts
 

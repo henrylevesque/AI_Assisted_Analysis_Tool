@@ -1,9 +1,8 @@
 # Documentation
 
 ## Model Choice
-tried using tinyllama because it is the smallest llm on ollama, but it gave stragne results
-tried llama3.3, but it was too large and took too long
-found gemma2 took direction well and worked well
+I initially tried using tinyllama because it is the smallest llm on ollama, but it gave strange results
+tried llama3.3, but it was too large and took too long to run. I found that gemma2, the default quant size which is 9b, took direction well and worked well
 
 ## Data Managment
 
