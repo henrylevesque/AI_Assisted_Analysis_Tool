@@ -339,4 +339,3 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 - Web interface for easier configuration
 - Batch processing across multiple files
 - Custom consensus algorithms
-- Integration with cloud-based LLM APIs
