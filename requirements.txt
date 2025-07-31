@@ -2,3 +2,4 @@ ollama
 tqdm
 pandas
 openpyxl
+py-cpuinfo

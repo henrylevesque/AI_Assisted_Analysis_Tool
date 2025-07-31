@@ -1,14 +1,58 @@
 # AI Assisted Analysis Tool
 
-This project is an open-source, locally run AI-assisted text analysis tool powered by Ollama. The tool is currently set up to to run AI-assisted analysis on an entire bibliography exported from Zotero. Users who want to use this tool should have Zotero installed and export a collection they want to perform the AI analysis on as a .csv file.
 
-This tool is based on [Ollama](https://github.com/ollama/ollama-python) and is structured to work with bibliographic data exported from [Zotero](https://www.zotero.org/) to query abstracts. This code can also be used to query other types of data in .csv or .xls format using the `custom_analysis.py` file.
+This project is an open-source, locally run AI-assisted text analysis tool powered by Ollama. It now supports two distinct workflows:
+
+## 1. Custom Analysis Workflow (NEW)
+
+**Purpose:** Analyze any tabular data (Excel or CSV) using AI, not limited to abstracts. This workflow is flexible and user-friendly, allowing you to select which columns to analyze and how the results are reported.
+
+**Key Features:**
+- Works with any Excel or CSV file (not just abstracts)
+- Lists all columns and lets you select identifier and content columns by name
+- Lets you define what you want the AI to identify in your data (custom prompt)
+- Allows you to set the number of analysis runs for each row
+- Optionally aggregates AI responses for consensus and confidence
+- Optionally appends all reporting info (prompt, runs, hardware, consensus summary, etc.) to the bottom of the Excel output file
+- Enhanced reporting: includes prompt, number of runs, analysis duration, CPU/GPU info
+- Cross-platform: Windows, macOS, Linux
+
+**How to Use:**
+1. Prepare your Excel or CSV file and place it in your chosen data input folder.
+2. Run the script:
+   ```
+   python other_analysis/custom_analysis.py
+   ```
+3. Follow the prompts:
+   - Select the AI model (or press Enter for the recommended model)
+   - Enter what you want the program to identify in your data (custom prompt)
+   - Choose columns for identifier and content by name
+   - Set the number of runs for analysis
+   - Optionally aggregate AI responses for consensus and confidence
+   - Optionally append all reporting info to the bottom of the output Excel file
+4. Review your results in the output Excel file (includes consensus columns and reporting info if selected)
+
+## 2. Zotero Abstracts Workflow (ORIGINAL)
+
+**Purpose:** Analyze bibliographic abstracts exported from Zotero. This workflow is designed for users working specifically with Zotero data and abstracts.
+
+**Key Features:**
+- Designed for Zotero exports (CSV/Excel) containing bibliographic abstracts
+- Uses replication and consensus-based approach to improve reliability
+- Maintains local control of data for privacy and compliance
+- Open-source and reproducible
+
+**How to Use:**
+1. Export your collection from Zotero as a CSV or Excel file
+2. Use the provided scripts (e.g., `methods.py`, `results.py`, `location.py`, `theory.py`, `n_themes.py`) in the `python_for_Zotero_abstracts` folder to run targeted analyses on your exported data
+3. Follow the prompts in each script for results and consensus aggregation
+4. Review your results in the output Excel file
+
+---
 
 ## Key Features
-- Designed to work with Zotero exports (CSV/Excel).
-- Uses replication to mitigate potential errors with a consensus-based approach.
-- Maintains local control of data to ensure compliance with data-handling requirements.
-- Provides an open-source, reproducible method for analysis.
+
+## Requirements
 
 ## Requirements
 - **Python 3.7+** with virtual environment support
@@ -23,29 +67,44 @@ This tool is based on [Ollama](https://github.com/ollama/ollama-python) and is s
   - `openpyxl` - Excel file handling
 - Requires you to download or "pull" a model from Ollama to run the analysis. The examples code here all use Gemma2:9b.
 
-## Prompts
 
-### Identify Urban Planning Theory
-Provide the text of an abstract. The tool will identify the urban planning theory used in the abstract. If no urban planning theory was used, it will say "none."
+## Prompts (Zotero Abstracts Workflow)
 
-### Identify Themes
-Provide the text of an abstract. The tool will identify three themes from the abstract.
+The following scripts in `python_for_Zotero_abstracts` are designed for specific types of analysis:
 
-### Identify Methods
-Provide the text of an abstract. The tool will identify the methods used in the abstract.
+- `theory.py`: Identify urban planning theory used in abstracts
+- `n_themes.py`: Identify three themes from abstracts
+- `methods.py`: Identify methods used in abstracts
+- `results.py`: Identify results from abstracts
+- `location.py`: Identify where the research was conducted
 
-### Identify Results
-Provide the text of an abstract. The tool will identify the results from the abstract.
-
-### Identify Location
-Provide the text of an abstract. The tool will identify where the research was conducted. If no location is mentioned, it will say "none."
+Each script will prompt you for the required input and provide results in the output Excel file.
 
 ## How to Use
 
-1. **Export from Zotero**: Export the collection you want to analyze from Zotero as a CSV or Excel file.
-2. **Run the Python files**: Use the provided Python code to run a specific AI analysis on the exported file (e.g., methods, results, location).
-3. **Analyze Results**: The tool will process each item in the bibliography, using Ollama to extract specific data from the bibliographic items. The code uses replication to account for any potential errors, employing a consensus-based approach to pull data from the bibliographic items.
-4. **Aggregate AI Results for Consensus**: Run the `ai_response_aggregation.py` file to aggregate the AI responses and get the result of the consensus and a rating for how strong the consensus is. This can also be used to highlight which responses have a low confidence and may require manual review.
+
+### Custom Analysis Workflow (custom_analysis.py)
+
+1. **Prepare Your Data**: Place your CSV or Excel file in the data input folder.
+2. **Run the Script**:
+   ```
+   python other_analysis/custom_analysis.py
+   ```
+3. **Follow Prompts**:
+   - Select the model to use (or press Enter for the recommended model).
+   - Define what you want the program to identify within the text.
+   - Choose columns for identifier and content by name.
+   - Set the number of runs for analysis.
+4. **Consensus & Reporting**:
+   - Optionally aggregate AI responses for consensus and confidence.
+   - Optionally append all reporting info to the bottom of the output Excel file.
+5. **Review Output**:
+   - Results are saved to an Excel file in the specified output folder.
+   - Consensus columns and reporting info are included if selected.
+
+### Zotero Abstracts Workflow (original)
+
+The workflow for analyzing Zotero abstracts and bibliographies remains unchanged. Export your collection from Zotero as a CSV or Excel file and use the provided scripts (e.g., `methods.py`, `results.py`, `location.py`, `theory.py`, `n_themes.py`) to run targeted analyses on your exported data. Follow the prompts in each script for results and consensus aggregation as before.
 
 ## Flow Diagram
 
