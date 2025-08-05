@@ -175,8 +175,12 @@ def main():
             # Add prompt, number of runs, analysis duration, and system info to reporting
             print(f"\nPrompt used for analysis:")
             print(f"{prompt}")
+            print(f"Ollama model used: {selected_model}")
             print(f"Number of runs per row: {num_runs}")
-            print(f"Analysis duration: {analysis_duration:.2f} seconds")
+            # Format duration as hours, minutes, seconds
+            hours, rem = divmod(analysis_duration, 3600)
+            minutes, seconds = divmod(rem, 60)
+            print(f"Analysis duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s")
             # Cross-platform CPU info
             try:
                 import cpuinfo
@@ -251,8 +255,12 @@ def main():
                 ws.append([])
                 ws.append(["Prompt used for analysis:"])
                 ws.append([prompt])
+                ws.append([f"Ollama model used: {selected_model}"])
                 ws.append([f"Number of runs per row: {num_runs}"])
-                ws.append([f"Analysis duration: {analysis_duration:.2f} seconds"])
+                # Format duration as hours, minutes, seconds
+                hours, rem = divmod(analysis_duration, 3600)
+                minutes, seconds = divmod(rem, 60)
+                ws.append([f"Analysis duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
                 ws.append([f"CPU: {cpu_brand}"])
                 ws.append([f"GPU: {gpu_report}"])
                 wb.save(output_file_path)
