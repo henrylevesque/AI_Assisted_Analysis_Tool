@@ -1,4 +1,28 @@
+
 # AI Assisted Analysis Tool - Technical Documentation
+
+## Getting Started
+
+1. **Clone the repository**
+   ```powershell
+   git clone https://github.com/hleve/AI_Assisted_Analysis_Tool.git
+   ```
+
+2. **Install dependencies**
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
+3. **Run the main script**
+   ```powershell
+   python ai_assisted_analysis.py
+   ```
+
+4. **Explore analysis modules**
+   - `other_analysis/ai_response_aggregation.py`: Aggregates AI responses
+   - `python_for_Zotero_abstracts/`: Contains thematic and methodological analysis scripts
+
+---
 
 This document provides detailed technical information about the AI Assisted Analysis Tool, including implementation details, model choices, data management strategies, and workflow processes.
 
