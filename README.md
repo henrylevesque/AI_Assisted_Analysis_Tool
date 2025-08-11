@@ -38,10 +38,6 @@ This project is an open-source, locally run AI-assisted text analysis tool power
 **Purpose:** Analyze bibliographic abstracts exported from Zotero. This workflow is designed for users working specifically with Zotero data and abstracts.
 
 **Key Features:**
-- Designed for Zotero exports (CSV/Excel) containing bibliographic abstracts
-- Uses replication and consensus-based approach to improve reliability
-- Maintains local control of data for privacy and compliance
-- Open-source and reproducible
 
 **How to Use:**
 1. Export your collection from Zotero as a CSV or Excel file
@@ -49,25 +45,71 @@ This project is an open-source, locally run AI-assisted text analysis tool power
 3. Follow the prompts in each script for results and consensus aggregation
 4. Review your results in the output Excel file
 
----
 
 ## Key Features
 
 ## Requirements
 
 ## Requirements
-- **Python 3.7+** with virtual environment support
-- **Ollama** - AI model runtime
   - [Ollama for Windows](https://ollama.com/download/windows)
   - [Ollama for Mac](https://ollama.com/download/mac)
   - [Ollama for Linux](https://ollama.com/download/linux)
-- **Python Packages** (automatically installed via requirements.txt):
   - `ollama` - Python client for Ollama
   - `pandas` - Data manipulation and analysis
   - `tqdm` - Progress bars
   - `openpyxl` - Excel file handling
-- Requires you to download or "pull" a model from Ollama to run the analysis. The examples code here all use Gemma2:9b.
 
+## AI Assisted Analysis Tool
+
+### Project Goals
+This project aims to provide tools for AI-assisted analysis and aggregation of responses, supporting research workflows and data exploration.
+
+### Features
+- Aggregates AI responses from various sources
+- Modular analysis methods (see `other_analysis/` and `python_for_Zotero_abstracts/`)
+- Extensible for new data formats and sources
+
+### Installation
+1. Clone the repository:
+    ```powershell
+    git clone https://github.com/hleve/AI_Assisted_Analysis_Tool.git
+    ```
+2. Install dependencies:
+    ```powershell
+    pip install -r requirements.txt
+    ```
+
+### Usage Example
+Run the main analysis script:
+```powershell
+python ai_assisted_analysis.py
+```
+
+### Getting Started
+See `documentation.md` for a step-by-step guide.
+
+### Contributing
+Contributions are welcome! Please see `CONTRIBUTING.md` (to be created) for guidelines.
+
+
+### License
+See `LICENSE` for details.
+
+---
+
+## Project Logic and Methodology
+
+This tool is designed to leverage AI models for research analysis, with a focus on reliability and reproducibility. The core logic includes:
+
+- **Replication for Error Minimization:**
+    - Analyses are run multiple times (replicated) to reduce the impact of random errors or outlier responses from AI models.
+    - Aggregation and consensus algorithms are used to combine results, improving reliability and confidence in findings.
+
+- **Prompt Engineering for Quantitative Analysis:**
+    - Prompts can be crafted to request numerical values from AI models (e.g., ratings, counts, scores).
+    - These outputs can be collected across replications and subjected to standard statistical analyses, such as ANOVA or T-tests, to assess differences, trends, or significance.
+
+This approach allows researchers to harness the flexibility of AI while maintaining scientific rigor and transparency in their workflows.
 
 ## Prompts (Zotero Abstracts Workflow)
 
