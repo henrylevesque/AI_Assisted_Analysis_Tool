@@ -51,10 +51,10 @@ This project is an open-source, locally run AI-assisted text analysis tool power
 ## Requirements
 
 ## Requirements
-  - [Ollama for Windows](https://ollama.com/download/windows)
-  - [Ollama for Mac](https://ollama.com/download/mac)
-  - [Ollama for Linux](https://ollama.com/download/linux)
-  - `ollama` - Python client for Ollama
+   - `ollama` - Python client for Ollama
+      - [Ollama for Windows](https://ollama.com/download/windows)
+      - [Ollama for Mac](https://ollama.com/download/mac)
+      - [Ollama for Linux](https://ollama.com/download/linux)
   - `pandas` - Data manipulation and analysis
   - `tqdm` - Progress bars
   - `openpyxl` - Excel file handling
