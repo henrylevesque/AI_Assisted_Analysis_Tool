@@ -264,9 +264,9 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
     ```sh
     python <filename>.py
     ```
-    Replace `<filename>` with the name of the Python file you want to run. For example, to run `custom_analysis.py`, use:
+    Replace `<filename>` with the name of the Python file you want to run. For example, to run `ai_assisted_analysis.py`, use:
     ```sh
-    python custom_analysis.py
+    python ai_assisted_analysis.py
     ```
 
 3. **Follow any additional prompts or instructions** provided by the script to complete the analysis.
