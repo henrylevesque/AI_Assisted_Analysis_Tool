@@ -13,8 +13,8 @@ This project is an open-source, locally run AI-assisted text analysis tool power
 - Lets you define what you want the AI to identify in your data (custom prompt)
 - Allows you to set the number of analysis runs for each row
 - Optionally aggregates AI responses for consensus and confidence
-- Optionally appends all reporting info (prompt, runs, hardware, consensus summary, etc.) to the bottom of the Excel output file
-- Enhanced reporting: includes prompt, number of runs, analysis duration, CPU/GPU info
+- Optionally appends all reporting info (prompt, LLM, runs, hardware, consensus summary, etc.) to the bottom of the Excel output file
+- Enhanced reporting: includes prompt, LLM used, number of runs, analysis duration, CPU/GPU info
 - Cross-platform: Windows, macOS, Linux
 
 **How to Use:**
