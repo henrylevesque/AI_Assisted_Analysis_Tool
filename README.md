@@ -89,7 +89,7 @@ python ai_assisted_analysis.py
 See `documentation.md` for a step-by-step guide.
 
 ### Contributing
-Contributions are welcome! Please see `CONTRIBUTING.md` (to be created) for guidelines.
+Contributions are welcome! Please see `CONTRIBUTING.md` for contribution guidelines, issue templates, and the code of conduct.
 
 
 ### License
