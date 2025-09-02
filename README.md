@@ -3,7 +3,7 @@
 
 This project is an open-source, locally run AI-assisted text analysis tool powered by Ollama. It now supports two distinct workflows:
 
-## 1. Custom Analysis Workflow
+## 1. Analysis Workflow
 
 **Purpose:** Analyze any tabular data (Excel or CSV) using AI, not limited to abstracts. This workflow is flexible and user-friendly, allowing you to select which columns to analyze and how the results are reported.
 
