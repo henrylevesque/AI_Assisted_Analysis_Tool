@@ -3,7 +3,7 @@
 
 This project is an open-source, locally run AI-assisted text analysis tool powered by Ollama. It now supports two distinct workflows:
 
-## 1. Custom Analysis Workflow (NEW)
+## 1. Analysis Workflow
 
 **Purpose:** Analyze any tabular data (Excel or CSV) using AI, not limited to abstracts. This workflow is flexible and user-friendly, allowing you to select which columns to analyze and how the results are reported.
 
@@ -13,8 +13,8 @@ This project is an open-source, locally run AI-assisted text analysis tool power
 - Lets you define what you want the AI to identify in your data (custom prompt)
 - Allows you to set the number of analysis runs for each row
 - Optionally aggregates AI responses for consensus and confidence
-- Optionally appends all reporting info (prompt, runs, hardware, consensus summary, etc.) to the bottom of the Excel output file
-- Enhanced reporting: includes prompt, number of runs, analysis duration, CPU/GPU info
+- Optionally appends all reporting info (prompt, LLM, runs, hardware, consensus summary, etc.) to the bottom of the Excel output file
+- Enhanced reporting: includes prompt, LLM used, number of runs, analysis duration, CPU/GPU info
 - Cross-platform: Windows, macOS, Linux
 
 **How to Use:**
@@ -33,7 +33,7 @@ This project is an open-source, locally run AI-assisted text analysis tool power
    - Optionally append all reporting info to the bottom of the output Excel file
 5. Review your results in the output Excel file (includes consensus columns and reporting info if selected)
 
-## 2. Zotero Abstracts Workflow (ORIGINAL)
+## 2. Zotero Abstracts Workflow
 
 **Purpose:** Analyze bibliographic abstracts exported from Zotero. This workflow is designed for users working specifically with Zotero data and abstracts.
 
@@ -51,10 +51,10 @@ This project is an open-source, locally run AI-assisted text analysis tool power
 ## Requirements
 
 ## Requirements
-  - [Ollama for Windows](https://ollama.com/download/windows)
-  - [Ollama for Mac](https://ollama.com/download/mac)
-  - [Ollama for Linux](https://ollama.com/download/linux)
-  - `ollama` - Python client for Ollama
+   - `ollama` - Python client for Ollama
+      - [Ollama for Windows](https://ollama.com/download/windows)
+      - [Ollama for Mac](https://ollama.com/download/mac)
+      - [Ollama for Linux](https://ollama.com/download/linux)
   - `pandas` - Data manipulation and analysis
   - `tqdm` - Progress bars
   - `openpyxl` - Excel file handling
@@ -89,7 +89,7 @@ python ai_assisted_analysis.py
 See `documentation.md` for a step-by-step guide.
 
 ### Contributing
-Contributions are welcome! Please see `CONTRIBUTING.md` (to be created) for guidelines.
+Contributions are welcome! Please see `CONTRIBUTING.md` for contribution guidelines, issue templates, and the code of conduct.
 
 
 ### License
@@ -126,12 +126,12 @@ Each script will prompt you for the required input and provide results in the ou
 ## How to Use
 
 
-### Custom Analysis Workflow (custom_analysis.py)
+### Custom Analysis Workflow (ai_assisted_analysis.py)
 
 1. **Prepare Your Data**: Place your CSV or Excel file in the data input folder.
 2. **Run the Script**:
    ```
-   python other_analysis/custom_analysis.py
+   python ai_assisted_analysis.py
    ```
 3. **Follow Prompts**:
    - Select the model to use (or press Enter for the recommended model).
@@ -145,7 +145,7 @@ Each script will prompt you for the required input and provide results in the ou
    - Results are saved to an Excel file in the specified output folder.
    - Consensus columns and reporting info are included if selected.
 
-### Zotero Abstracts Workflow (original)
+### Zotero Abstracts Workflow
 
 The workflow for analyzing Zotero abstracts and bibliographies remains unchanged. Export your collection from Zotero as a CSV or Excel file and use the provided scripts (e.g., `methods.py`, `results.py`, `location.py`, `theory.py`, `n_themes.py`) to run targeted analyses on your exported data. Follow the prompts in each script for results and consensus aggregation as before.
 
@@ -201,7 +201,7 @@ graph LR
     pip install -r requirements.txt
     ```
 
-5. **Install Chosen LLM**:
+5. **Install Chosen LLM (gemma2 is the recommended model)**:
     ```sh    ollama pull gemma2
     ```
 
@@ -264,9 +264,9 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
     ```sh
     python <filename>.py
     ```
-    Replace `<filename>` with the name of the Python file you want to run. For example, to run `custom_analysis.py`, use:
+    Replace `<filename>` with the name of the Python file you want to run. For example, to run `ai_assisted_analysis.py`, use:
     ```sh
-    python custom_analysis.py
+    python ai_assisted_analysis.py
     ```
 
 3. **Follow any additional prompts or instructions** provided by the script to complete the analysis.
