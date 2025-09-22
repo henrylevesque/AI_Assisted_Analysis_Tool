@@ -4,3 +4,4 @@ pandas
 openpyxl
 py-cpuinfo
 rapidfuzz
+pyyaml
