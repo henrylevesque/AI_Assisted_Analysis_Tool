@@ -1,9 +1,9 @@
 # AI Assisted Analysis Tool
 
 
-This project is an open-source, locally run AI-assisted text analysis tool powered by Ollama. It now supports two distinct workflows:
+This project is an open-source, locally run AI-assisted text or image analysis tool powered by Ollama. It now supports three distinct workflows:
 
-## 1. Analysis Workflow
+## 1. Analysis Workflow - Text
 
 **Purpose:** Analyze any tabular data (Excel or CSV) using AI, not limited to abstracts. This workflow is flexible and user-friendly, allowing you to select which columns to analyze and how the results are reported.
 
@@ -33,7 +33,46 @@ This project is an open-source, locally run AI-assisted text analysis tool power
    - Optionally append all reporting info to the bottom of the output Excel file
 5. Review your results in the output Excel file (includes consensus columns and reporting info if selected)
 
-## 2. Zotero Abstracts Workflow
+## 2. Analysis Workflow — Image
+
+**Purpose:** Analyze images using local vision-capable models and compare responses across models.
+
+**Key Features:**
+- Run one or more vision models sequentially to avoid constant context switching
+- Run multiple replicates per image and record per-model Response_1..N
+- Compute per-model Consensus and Consensus_Confidence using modes: `exact`, `set`, or `fuzzy`
+- Fuzzy consensus uses `rapidfuzz` to cluster similar responses (install `rapidfuzz` to enable)
+- Progress bars (tqdm) and an optional inter-model `switch_delay` to allow operator/model switching
+- Output is an Excel file with a metadata sheet containing prompt, model(s), runs, duration, and environment info
+
+**How to Use:**
+1. Prepare a folder containing your image files and create an output folder for results.
+2. Make sure your local Ollama runtime has a vision-capable model available (for example: `gemma2-vision`). Pull it if needed:
+    ```powershell
+    ollama pull gemma2-vision
+    ```
+3. Run the script:
+    ```powershell
+    python image_analysis.py
+    ```
+4. Follow the prompts:
+    - Select the vision model to use (or press Enter for the recommended model)
+    - Set the number of runs per image (replications)
+    - Choose a consensus mode: `exact`, `set`, or `fuzzy` (set uses normalized sets, fuzzy groups similar responses)
+    - If using `fuzzy`, set a fuzzy threshold (default shown in the prompt) and ensure `rapidfuzz` is installed
+    - Optionally set `switch_delay` (seconds) to pause between models when running multiple models sequentially
+    - Choose whether to append reporting metadata to the output Excel file
+5. Inspect the Excel output: each model has Response_1..N columns followed by `Consensus` and `Consensus_Confidence`; a `metadata` sheet contains run details.
+
+**Notes:**
+- Install Python dependencies listed in `requirements.txt`. For fuzzy consensus, ensure `rapidfuzz` is present:
+  ```powershell
+  pip install rapidfuzz
+  ```
+- PowerShell users: run the commands above in an activated virtual environment to ensure packages are available.
+
+
+## 3. Zotero Abstracts Workflow - Text
 
 **Purpose:** Analyze bibliographic abstracts exported from Zotero. This workflow is designed for users working specifically with Zotero data and abstracts.
 
@@ -45,10 +84,6 @@ This project is an open-source, locally run AI-assisted text analysis tool power
 3. Follow the prompts in each script for results and consensus aggregation
 4. Review your results in the output Excel file
 
-
-## Key Features
-
-## Requirements
 
 ## Requirements
    - `ollama` - Python client for Ollama
