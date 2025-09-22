@@ -84,6 +84,16 @@ This project is an open-source, locally run AI-assisted text or image analysis t
 3. Follow the prompts in each script for results and consensus aggregation
 4. Review your results in the output Excel file
 
+### Prompts
+
+The following scripts in `python_for_Zotero_abstracts` are designed for specific types of analysis:
+
+- `theory.py`: Identify urban planning theory used in abstracts
+- `n_themes.py`: Identify three themes from abstracts
+- `methods.py`: Identify methods used in abstracts
+- `results.py`: Identify results from abstracts
+- `location.py`: Identify where the research was conducted
+
 
 ## Requirements
    - `ollama` - Python client for Ollama
@@ -101,7 +111,7 @@ This project aims to provide tools for AI-assisted analysis and aggregation of r
 
 ### Features
 - Aggregates AI responses from various sources
-- Modular analysis methods (see `other_analysis/` and `python_for_Zotero_abstracts/`)
+- Modular analysis methods (see `python_for_Zotero_abstracts/`)
 - Extensible for new data formats and sources
 
 ### Installation
@@ -151,49 +161,14 @@ This tool is designed to leverage AI models for research analysis, with a focus 
 
 This approach allows researchers to harness the flexibility of AI while maintaining scientific rigor and transparency in their workflows.
 
-## Prompts (Zotero Abstracts Workflow)
-
-The following scripts in `python_for_Zotero_abstracts` are designed for specific types of analysis:
-
-- `theory.py`: Identify urban planning theory used in abstracts
-- `n_themes.py`: Identify three themes from abstracts
-- `methods.py`: Identify methods used in abstracts
-- `results.py`: Identify results from abstracts
-- `location.py`: Identify where the research was conducted
-
 Each script will prompt you for the required input and provide results in the output Excel file.
 
-## How to Use
-
-
-### Custom Analysis Workflow (text_analysis.py)
-
-1. **Prepare Your Data**: Place your CSV or Excel file in the data input folder.
-2. **Run the Script**:
-    ```powershell
-    python text_analysis.py
-    ```
-3. **Follow Prompts**:
-   - Select the model to use (or press Enter for the recommended model).
-   - Define what you want the program to identify within the text.
-   - Choose columns for identifier and content by name.
-   - Set the number of runs for analysis.
-4. **Consensus & Reporting**:
-   - Optionally aggregate AI responses for consensus and confidence.
-   - Optionally append all reporting info to the bottom of the output Excel file.
-5. **Review Output**:
-   - Results are saved to an Excel file in the specified output folder.
-   - Consensus columns and reporting info are included if selected.
-
-### Zotero Abstracts Workflow
-
-The workflow for analyzing Zotero abstracts and bibliographies remains unchanged. Export your collection from Zotero as a CSV or Excel file and use the provided scripts (e.g., `methods.py`, `results.py`, `location.py`, `theory.py`, `n_themes.py`) to run targeted analyses on your exported data. Follow the prompts in each script for results and consensus aggregation as before.
 
 ## Flow Diagram
 
 ```mermaid
 graph LR
-    A[Start] --> B[Read CSV/Excel File]
+    A[Start] --> B[Read CSV/Excel File/Image folder]
     B --> C[Initialize Responses List]
     C --> D{Loop Through Runs}
     D --> E[Run 1]
@@ -204,7 +179,7 @@ graph LR
     G --> H
     H --> I[Append Title and Abstract]
     I --> J[Parse prompt]
-    J --> K[Send to AI Model]
+    J --> K[Send to AI Model(s)]
     K --> L[Receive Response]
     L --> M[Append Response to List]
     M --> H
@@ -304,9 +279,15 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
     ```sh
     python <filename>.py
     ```
-    Replace `<filename>` with the name of the Python file you want to run. For example, to run `ai_assisted_analysis.py`, use:
+    Replace `<filename>` with the name of the Python file you want to run. For example, to run `text_analysis.py`, use:
     ```sh
-    python ai_assisted_analysis.py
+    python text_analysis.py
     ```
 
 3. **Follow any additional prompts or instructions** provided by the script to complete the analysis.
+
+## Citation
+
+If you use this software (or parts of it) in a publication, please cite this project. The canonical citation information is included in the repository's `CITATION.cff` file — please use that metadata (authors, title, version, DOI) when referencing this work.
+
+
