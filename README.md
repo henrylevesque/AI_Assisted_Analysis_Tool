@@ -1,6 +1,5 @@
 # AI Assisted Analysis Tool
 
-
 ## Introduction
 
 AI Assisted Analysis Tool is an open-source, locally-run toolkit for AI-assisted text and image analysis based on Ollama. It supports three main workflows (text, image, Zotero abstracts) and is designed for reproducible, researcher-friendly analyses. See the Project Goals, License, and Citation sections for more details: [Project Goals](#project-goals) · [License](#license) · [Citation](#citation).
@@ -129,15 +128,6 @@ The following scripts in `python_for_Zotero_abstracts` are designed for specific
   - `tqdm` - Progress bars
   - `openpyxl` - Excel file handling
 
-## AI Assisted Analysis Tool
-
-### Project Goals
-This project aims to provide tools for AI-assisted analysis and aggregation of responses, supporting research workflows and data exploration.
-
-### Features
-- Aggregates AI responses from various sources
-- Modular analysis methods (see `python_for_Zotero_abstracts/`)
-- Extensible for new data formats and sources
 
 ### Installation
 1. Clone the repository:
@@ -148,22 +138,6 @@ This project aims to provide tools for AI-assisted analysis and aggregation of r
     ```powershell
     pip install -r requirements.txt
     ```
-
-### Usage Example
-Run the text-analysis script:
-```powershell
-python text_analysis.py
-    Run the image-analysis script (compare vision models):
-    ```powershell
-    python image_analysis.py
-    ```
-
-```
-
-Run the image-analysis script (compare vision models):
-```powershell
-python image_analysis.py
-```
 
 ## Project Logic and Methodology
 
@@ -180,7 +154,6 @@ This tool is designed to leverage AI models for research analysis, with a focus 
 This approach allows researchers to harness the flexibility of AI while maintaining scientific rigor and transparency in their workflows.
 
 Each script will prompt you for the required input and provide results in the output Excel file.
-
 
 ## Flow Diagram
 
@@ -234,8 +207,9 @@ graph LR
     pip install -r requirements.txt
     ```
 
-5. **Install Chosen LLM (gemma2 is the recommended model)**:
-    ```sh    ollama pull gemma2
+5. **Install Chosen LLM (gemma2 is recommended for text, and gemma3:12b is recomended for images)**:
+    ```powershell
+    ollama pull gemma2
     ```
 
 ## Troubleshooting
