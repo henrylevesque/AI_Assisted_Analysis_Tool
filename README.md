@@ -1,7 +1,32 @@
 # AI Assisted Analysis Tool
 
 
-This project is an open-source, locally run AI-assisted text or image analysis tool powered by Ollama. It now supports three distinct workflows:
+## Introduction
+
+AI Assisted Analysis Tool is an open-source, locally-run toolkit for AI-assisted text and image analysis based on Ollama. It supports three main workflows (text, image, Zotero abstracts) and is designed for reproducible, researcher-friendly analyses. See the Project Goals, License, and Citation sections for more details: [Project Goals](#project-goals) · [License](#license) · [Citation](#citation).
+
+Key points:
+- Supported inputs: Excel, CSV, image folders, and Zotero exports.
+- Configuration: analysis scripts accept YAML or JSON config files (e.g., configs/text_analysis.yaml or configs/image_analysis.json).
+- Command-line usage: scripts also accept standard CLI arguments (example flags: --config, --model, --runs, --consensus, --output). Command-line arguments override config file values.
+- Defaults and precedence: built-in defaults → config file → explicit CLI arguments.
+
+Quick examples:
+- Use a YAML config:
+    ```sh
+    python text_analysis.py --config configs/text_analysis.yaml
+    ```
+- Use a JSON config and override runs on the CLI:
+    ```sh
+    python image_analysis.py --config configs/image_analysis.json --runs 3
+    ```
+
+Why use configs and CLI options:
+- Reproducibility: store full run settings in a config file for later reference.
+- Automation: enable batch runs or CI by supplying a single config file.
+- Flexibility: tweak individual settings on the fly via CLI without editing files.
+
+See the usage sections for each workflow for full lists of accepted config keys and CLI flags (Text Analysis, Image Analysis, Zotero Abstracts). For reporting, outputs include Excel files with optional embedded metadata and a metadata sheet documenting prompt, model, runs, duration, and environment.
 
 ## 1. Analysis Workflow - Text
 
@@ -47,9 +72,9 @@ This project is an open-source, locally run AI-assisted text or image analysis t
 
 **How to Use:**
 1. Prepare a folder containing your image files and create an output folder for results.
-2. Make sure your local Ollama runtime has a vision-capable model available (for example: `gemma2-vision`). Pull it if needed:
+2. Make sure your local Ollama runtime has a vision-capable model available (for example: `gemma23:12b`). Pull it if needed:
     ```powershell
-    ollama pull gemma2-vision
+    ollama pull gemma3:12b
     ```
 3. Run the script:
     ```powershell
@@ -128,24 +153,17 @@ This project aims to provide tools for AI-assisted analysis and aggregation of r
 Run the text-analysis script:
 ```powershell
 python text_analysis.py
+    Run the image-analysis script (compare vision models):
+    ```powershell
+    python image_analysis.py
+    ```
+
 ```
 
 Run the image-analysis script (compare vision models):
 ```powershell
 python image_analysis.py
 ```
-
-### Getting Started
-See `documentation.md` for a step-by-step guide.
-
-### Contributing
-Contributions are welcome! Please see `CONTRIBUTING.md` for contribution guidelines, issue templates, and the code of conduct.
-
-
-### License
-See `LICENSE` for details.
-
----
 
 ## Project Logic and Methodology
 
@@ -276,15 +294,64 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
         ```
 
 2. **Run the desired Python file**:
-    ```sh
-    python <filename>.py
-    ```
-    Replace `<filename>` with the name of the Python file you want to run. For example, to run `text_analysis.py`, use:
-    ```sh
-    python text_analysis.py
-    ```
+        ```sh
+        python <filename>.py
+        ```
+        Replace `<filename>` with the name of the Python file you want to run. For example, to run `text_analysis.py`, use:
+        ```sh
+        python text_analysis.py
+        ```
+
+        You can run the scripts three ways:
+
+        - Interactive CLI prompts (bypass config):
+
+            Run the script without `--no-interactive` or `--config`. The script will ask you for any missing settings (model, input, output, columns, runs, etc.). Example:
+
+            ```powershell
+            python text_analysis.py
+            # follow interactive prompts to select model, input file, columns, and runs
+            ```
+
+        - Fully non-interactive via CLI arguments (no config file):
+
+            Provide all required settings on the command line and include `--no-interactive` to prevent prompts. CLI arguments override values in any config file. Example:
+
+            ```powershell
+            python image_analysis.py --models "gemma3:12b" --input "./images" --output "results.xlsx" --runs 2 --consensus --consensus-mode fuzzy --fuzzy-threshold 85 --no-interactive
+            ```
+
+        - Config-file driven (JSON or YAML) with optional CLI overrides:
+
+            Supply a `--config` file in JSON or YAML format. The script will read settings from that file. Any CLI arguments you pass will override corresponding config values. Use `--no-interactive` for fully deterministic runs.
+
+            ```powershell
+            python text_analysis.py --config configs/text_config_example.yaml --no-interactive
+            # or override a setting from the config:
+            python text_analysis.py --config configs/text_config_example.yaml --runs 1 --no-interactive
+            ```
+            
+            ### Boolean flags: --consensus / --no-consensus
+
+            The scripts use mutually-exclusive on/off flags for important boolean options so that the absence of a flag does not accidentally override a value in your config file. For example, the consensus setting is tri-state:
+
+            - If you pass `--consensus`, consensus is enabled for this run.
+            - If you pass `--no-consensus`, consensus is disabled for this run.
+            - If you omit both flags, the script will defer to the value found in your config file (or fall back to the script default if the config doesn't specify it).
+
+            This pattern preserves the precedence rule (CLI overrides config) while allowing "no-op" CLI runs that don't overwrite config values unintentionally.
 
 3. **Follow any additional prompts or instructions** provided by the script to complete the analysis.
+
+### Getting Started
+See `documentation.md` for a step-by-step guide.
+
+### Contributing
+Contributions are welcome! Please see `CONTRIBUTING.md` for contribution guidelines, issue templates, and the code of conduct.
+
+
+## License
+See `LICENSE` for details.
 
 ## Citation
 

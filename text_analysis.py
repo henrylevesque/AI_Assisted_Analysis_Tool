@@ -66,7 +66,11 @@ def main():
     parser.add_argument('--id-col', help='Identifier column name')
     parser.add_argument('--content-col', help='Content column name')
     parser.add_argument('--runs', type=int, help='Number of runs per row')
-    parser.add_argument('--consensus', action='store_true', help='Enable consensus calculation after runs')
+    # consensus flags: mutually exclusive. default None means "don't override config"
+    grp = parser.add_mutually_exclusive_group()
+    grp.add_argument('--consensus', dest='consensus', action='store_true', help='Force consensus on')
+    grp.add_argument('--no-consensus', dest='consensus', action='store_false', help='Force consensus off')
+    parser.set_defaults(consensus=None)
     parser.add_argument('--consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Consensus mode')
     parser.add_argument('--fuzzy-threshold', type=int, help='Fuzzy threshold (0-100)')
     parser.add_argument('--delay', type=float, help='Delay between model runs in seconds')
