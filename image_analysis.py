@@ -5,6 +5,8 @@ from tqdm import tqdm
 from ollama import chat
 import sys
 import re
+import platform
+import subprocess
 from collections import Counter
 
 
@@ -298,6 +300,165 @@ def main():
         print("Reporting metadata appended.")
     except Exception as e:
         print(f"Could not append reporting metadata: {e}")
+
+    # Consolidated aggregated consensus and cross-model consensus (optional)
+    try:
+        # read the saved sheet for post-hoc aggregation
+        try:
+            df_report = pd.read_excel(output_file_path)
+        except Exception as e:
+            print(f"Could not read {output_file_path} for aggregation: {e}")
+            df_report = None
+
+        aggregated = False
+        agg_summary = {}
+        run_aggregation = input("Do you want to aggregate AI responses for consensus across the output file? (y/n): ").strip().lower()
+        if run_aggregation == 'y' and df_report is not None:
+            agg_mode = input(f"Aggregated consensus mode (exact/set/fuzzy) [{consensus_mode}]: ").strip().lower() or consensus_mode
+            agg_fuzzy_thr = fuzzy_threshold
+            if agg_mode == 'fuzzy':
+                thr_in = input(f"Aggregated fuzzy threshold (0-100) [{fuzzy_threshold}]: ").strip()
+                try:
+                    agg_fuzzy_thr = int(thr_in) if thr_in else fuzzy_threshold
+                except Exception:
+                    agg_fuzzy_thr = fuzzy_threshold
+
+            response_cols = [col for col in df_report.columns if col.lower().startswith('response')]
+            print(f"\nFound {len(response_cols)} response columns. Calculating aggregated consensus using mode={agg_mode}...")
+
+            try:
+                aggregated_consensus, aggregated_conf = compute_consensus_for_block(df_report, response_cols, mode=agg_mode, fuzzy_threshold=agg_fuzzy_thr)
+                df_report['Aggregated_Consensus'] = aggregated_consensus
+                df_report['Aggregated_Consensus_Confidence'] = aggregated_conf
+            except Exception as e:
+                print(f"Aggregated consensus failed: {e}")
+            else:
+                high_confidence = df_report[df_report['Aggregated_Consensus_Confidence'] >= 0.7]
+                medium_confidence = df_report[(df_report['Aggregated_Consensus_Confidence'] >= 0.4) & (df_report['Aggregated_Consensus_Confidence'] < 0.7)]
+                low_confidence = df_report[df_report['Aggregated_Consensus_Confidence'] < 0.4]
+                agg_summary = {
+                    'high': len(high_confidence),
+                    'medium': len(medium_confidence),
+                    'low': len(low_confidence),
+                    'low_rows': low_confidence
+                }
+                aggregated = True
+                try:
+                    df_report.to_excel(output_file_path, index=False)
+                    print(f"Aggregated consensus calculation complete. Results written to {output_file_path}")
+                except Exception as e:
+                    print(f"Could not write aggregated consensus to {output_file_path}: {e}")
+
+            # Cross-model consensus when multiple models are present
+            cross_model_done = False
+            if len(metadata_models) > 1:
+                cross_choice = input("Run cross-model consensus across per-model Consensus columns? (y/n): ").strip().lower() == 'y'
+                if cross_choice:
+                    per_model_cons_cols = [f"Consensus ({m})" for m in metadata_models if f"Consensus ({m})" in df_report.columns]
+                    if not per_model_cons_cols:
+                        per_model_cons_cols = [c for c in df_report.columns if c.lower().startswith('consensus (')]
+                    if per_model_cons_cols:
+                        print(f"Running cross-model consensus on columns: {per_model_cons_cols}")
+                        try:
+                            cross_cons, cross_conf = compute_consensus_for_block(df_report, per_model_cons_cols, mode=agg_mode, fuzzy_threshold=agg_fuzzy_thr)
+                            df_report['CrossModel_Consensus'] = cross_cons
+                            df_report['CrossModel_Consensus_Confidence'] = cross_conf
+                            cross_model_done = True
+                            print("Cross-model consensus computed and added to the output file.")
+                        except Exception as e:
+                            print(f"Cross-model consensus failed: {e}")
+                    else:
+                        print("No per-model consensus columns found for cross-model aggregation.")
+                    if cross_model_done:
+                        try:
+                            df_report.to_excel(output_file_path, index=False)
+                            print(f"Cross-model consensus saved to {output_file_path}")
+                        except Exception as e:
+                            print(f"Could not save cross-model consensus to {output_file_path}: {e}")
+
+        # Append final reporting metadata (including aggregated summary if any)
+        try:
+            from openpyxl import load_workbook
+            wb = load_workbook(output_file_path)
+            ws = wb.active
+            ws.append([])
+            ws.append(["Prompt used:", prompt_template])
+            ws.append(["Models used:", ', '.join(metadata_models)])
+            ws.append([f"Runs per image: {num_runs}"])
+            ws.append([f"Delay between model runs: {switch_delay} seconds"])
+            ws.append([f"Consensus enabled during runs: {do_consensus}"])
+            ws.append([f"Consensus mode (per-model): {consensus_mode}"])
+            if consensus_mode == 'fuzzy':
+                ws.append([f"Fuzzy threshold (per-model): {fuzzy_threshold}"])
+            hours, rem = divmod(analysis_duration, 3600)
+            minutes, seconds = divmod(rem, 60)
+            ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
+
+            if aggregated:
+                ws.append([])
+                ws.append(["Aggregated consensus across response columns:"])
+                ws.append([f"High confidence (≥70%): {agg_summary.get('high', 0)} rows"])
+                ws.append([f"Medium confidence (40-69%): {agg_summary.get('medium', 0)} rows"])
+                ws.append([f"Low confidence (<40%): {agg_summary.get('low', 0)} rows"])
+                if agg_summary.get('low', 0) > 0:
+                    ws.append(["Rows with low confidence may require manual review:"])
+                    for idx, row in agg_summary.get('low_rows').iterrows():
+                        id_display = row.get('Image', idx + 1)
+                        ws.append([f"Row {idx + 1}: {id_display} (confidence: {row['Aggregated_Consensus_Confidence']:.1%})"])
+
+            # CPU/GPU info
+            try:
+                import cpuinfo
+                cpu = cpuinfo.get_cpu_info()
+                cpu_brand = cpu.get('brand_raw', 'Unknown CPU')
+            except Exception:
+                cpu_brand = platform.processor() or platform.machine() or 'Unknown CPU'
+            ws.append([f"CPU: {cpu_brand}"])
+
+            gpu_info = None
+            integrated_gpu = None
+            for brand in ["Radeon", "NVIDIA", "Intel Graphics", "Iris", "GeForce", "RTX", "GTX"]:
+                if brand.lower() in cpu_brand.lower():
+                    integrated_gpu = cpu_brand
+                    break
+            try:
+                if sys.platform.startswith('win'):
+                    gpu_result = subprocess.run(['wmic', 'path', 'win32_VideoController', 'get', 'name'], capture_output=True, text=True)
+                    gpu_lines = gpu_result.stdout.splitlines()
+                    gpus = [line.strip() for line in gpu_lines if line.strip() and 'Name' not in line]
+                    gpu_info = ', '.join(gpus) if gpus else None
+                elif sys.platform.startswith('linux'):
+                    gpu_result = subprocess.run('lspci | grep -i vga', shell=True, capture_output=True, text=True)
+                    gpus = [line for line in gpu_result.stdout.splitlines() if line]
+                    gpu_info = ', '.join(gpus) if gpus else None
+                    gpu_result_3d = subprocess.run('lspci | grep -i 3d', shell=True, capture_output=True, text=True)
+                    gpus_3d = [line for line in gpu_result_3d.stdout.splitlines() if line]
+                    if gpus_3d:
+                        gpu_info = gpu_info + ', ' + ', '.join(gpus_3d) if gpu_info else ', '.join(gpus_3d)
+                elif sys.platform == 'darwin':
+                    gpu_result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], capture_output=True, text=True)
+                    gpus = []
+                    for line in gpu_result.stdout.splitlines():
+                        if 'Chipset Model:' in line or 'Vendor:' in line:
+                            gpus.append(line.strip())
+                    gpu_info = ', '.join(gpus) if gpus else None
+            except Exception:
+                gpu_info = None
+            all_gpus = []
+            if integrated_gpu:
+                all_gpus.append(f"Integrated GPU: {integrated_gpu}")
+            if gpu_info:
+                all_gpus.append(f"Detected GPU(s): {gpu_info}")
+            gpu_report = ', '.join(all_gpus) if all_gpus else 'Not detected'
+            ws.append([f"GPU: {gpu_report}"])
+
+            wb.save(output_file_path)
+            print(f"Reporting and aggregation information appended to {output_file_path}")
+        except Exception as e:
+            print(f"Could not append consolidated reporting metadata: {e}")
+
+    except Exception as e:
+        print(f"Aggregation/reporting error: {e}")
 
 
 
