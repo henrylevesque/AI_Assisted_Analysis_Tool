@@ -6,12 +6,39 @@ import platform
 import subprocess
 from collections import Counter
 import pandas as pd
+import argparse
+import json
+try:
+    import yaml
+except Exception:
+    yaml = None
 from tqdm import tqdm
 from ollama import chat
 
 
 def list_input_file(folder):
     return next((f for f in os.listdir(folder) if f.endswith('.csv') or f.endswith('.xlsx')), None)
+
+
+def load_config(path: str):
+    if not path:
+        return {}
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Config file not found: {path}")
+    with open(path, 'r', encoding='utf-8') as fh:
+        text = fh.read()
+    # try JSON first
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    # try YAML
+    if yaml:
+        try:
+            return yaml.safe_load(text)
+        except Exception:
+            pass
+    raise ValueError("Config file must be valid JSON or YAML")
 
 
 def get_user_columns(df):
@@ -30,6 +57,46 @@ def get_user_columns(df):
 def main():
     print('Python executable:', sys.executable)
 
+    # --- CLI / Config handling ---
+    parser = argparse.ArgumentParser(description='Text analysis with multi-model comparisons and consensus')
+    parser.add_argument('--config', '-c', help='Path to JSON or YAML config file')
+    parser.add_argument('--models', help='Comma-separated model names to run (overrides config)')
+    parser.add_argument('--input', help='Input folder path')
+    parser.add_argument('--output', help='Output folder path')
+    parser.add_argument('--id-col', help='Identifier column name')
+    parser.add_argument('--content-col', help='Content column name')
+    parser.add_argument('--runs', type=int, help='Number of runs per row')
+    parser.add_argument('--consensus', action='store_true', help='Enable consensus calculation after runs')
+    parser.add_argument('--consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Consensus mode')
+    parser.add_argument('--fuzzy-threshold', type=int, help='Fuzzy threshold (0-100)')
+    parser.add_argument('--delay', type=float, help='Delay between model runs in seconds')
+    parser.add_argument('--no-interactive', action='store_true', help='Run non-interactively (require args/config for prompts)')
+    args = parser.parse_args()
+
+    cfg = {}
+    if args.config:
+        try:
+            cfg = load_config(args.config) or {}
+        except Exception as e:
+            print(f"Could not load config {args.config}: {e}")
+            if args.no_interactive:
+                raise
+            cfg = {}
+
+    def _get(key, default=None):
+        val = getattr(args, key.replace('-', '_'), None)
+        if val is not None:
+            return val
+        # Try both hyphen and underscore forms in config
+        if key in cfg:
+            return cfg[key]
+        key_underscore = key.replace('-', '_')
+        if key_underscore in cfg:
+            return cfg[key_underscore]
+        return default
+        return cfg.get(key, default)
+
+
     # Try to list available Ollama models to help the user choose
     try:
         models = []
@@ -46,30 +113,44 @@ def main():
 
     # First ask whether to use a single model or compare multiple models
     suggested = ["gemma3:12b", "deepseek-ri:14b", "gpt-oss:20b"]
-    multi = input("Do you want to compare multiple models? (y/n): ").strip().lower() == 'y'
+    cli_models = _get('models')
     models_to_run = []
-    if multi:
-        print("Enter model names to compare separated by commas, or press Enter to use suggested models:")
-        m_input = input().strip()
-        if not m_input:
-            if models:
-                models_to_run = models
-            else:
-                models_to_run = suggested or ['gemma3:12b', 'gpt-oss:20b']
-        else:
-            models_to_run = [m.strip() for m in m_input.split(',') if m.strip()]
+    if cli_models:
+        models_to_run = [m.strip() for m in str(cli_models).split(',') if m.strip()]
     else:
-        single = input('Enter a single model to use (or press Enter for gemma2:latest): ').strip()
-        single_model = single or 'gemma2:latest'
-        if models and single_model not in models:
-            print(f"Warning: '{single_model}' not found in ollama list; proceeding with provided name.")
-        models_to_run = [single_model]
+        # interactive selection unless running non-interactively
+        if not args.no_interactive:
+            multi = input("Do you want to compare multiple models? (y/n): ").strip().lower() == 'y'
+            if multi:
+                print("Enter model names to compare separated by commas, or press Enter to use suggested models:")
+                m_input = input().strip()
+                if not m_input:
+                    models_to_run = models if models else suggested
+                else:
+                    models_to_run = [m.strip() for m in m_input.split(',') if m.strip()]
+            else:
+                single = input('Enter a single model to use (or press Enter for gemma2:latest): ').strip()
+                single_model = single or 'gemma2:latest'
+                if models and single_model not in models:
+                    print(f"Warning: '{single_model}' not found in ollama list; proceeding with provided name.")
+                models_to_run = [single_model]
+        else:
+            # non-interactive and no CLI models: use discovered or suggested
+            models_to_run = models if models else suggested
 
-    prompt_desc = input('Enter what you want the model or models to identify within the text').strip() or 'the main topic'
-    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text.Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helpful. The text is:'
-    
-    data_in = input('Data input folder [.] : ').strip() or '.'
-    data_out = input('Data output folder [.] : ').strip() or '.'
+    data_in = _get('input') or (input('Data input folder [.] : ').strip() if not args.no_interactive else '.')
+    data_out = _get('output') or (input('Data output folder [.] : ').strip() if not args.no_interactive else '.')
+    if args.no_interactive:
+        if data_in == '.':
+            print("Warning: Using current directory ('.') as input folder. Specify --input to override.")
+        if data_out == '.':
+            print("Warning: Using current directory ('.') as output folder. Specify --output to override.")
+        prompt_desc = input('Enter what you want the model or models to identify within the text: ').strip() or 'the main topic'
+    prompt_desc = prompt_desc or 'the main topic'
+    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helptful. The text is:'
+
+    data_in = _get('input') or (input('Data input folder [.] : ').strip() if not args.no_interactive else '.')
+    data_out = _get('output') or (input('Data output folder [.] : ').strip() if not args.no_interactive else '.')
 
     f = list_input_file(data_in)
     if not f:
@@ -78,7 +159,18 @@ def main():
     path = os.path.join(data_in, f)
     df = pd.read_csv(path) if path.endswith('.csv') else pd.read_excel(path)
 
-    id_col, content_col, num_runs = get_user_columns(df)
+    # columns and runs: attempt to pull from CLI/config, otherwise interactive
+    id_col = _get('id_col') or None
+    content_col = _get('content_col') or None
+    num_runs = _get('runs') or None
+    if not (id_col and content_col and num_runs):
+        if args.no_interactive:
+            # require id/content/runs in config/args
+            id_col = id_col or cfg.get('id_col')
+            content_col = content_col or cfg.get('content_col')
+            num_runs = num_runs or cfg.get('runs') or 1
+        else:
+            id_col, content_col, num_runs = get_user_columns(df)
     if id_col and id_col in df.columns:
         ids = df[id_col].tolist()
     else:
@@ -91,27 +183,28 @@ def main():
 
   
     # Consensus selection
-    do_consensus = input("Compute consensus after runs? (y/n) [y]: ").strip().lower()
-    do_consensus = True if do_consensus in ('', 'y', 'yes') else False
-    consensus_mode = 'exact'
-    fuzzy_threshold = 85
-    if do_consensus:
-        print("Consensus modes:\n  exact - normalized exact majority (default)\n  set - normalized set voting for comma-separated lists\n  fuzzy - fuzzy-string grouping (requires rapidfuzz)")
-        mode_in = input("Choose consensus mode (exact/set/fuzzy) [exact]: ").strip().lower() or 'exact'
-        if mode_in in ('exact', 'set', 'fuzzy'):
-            consensus_mode = mode_in
-        else:
-            print("Unknown mode, using 'exact'.")
-        if consensus_mode == 'fuzzy':
-            thr = input("Fuzzy threshold (0-100) [85]: ").strip()
-            try:
-                fuzzy_threshold = int(thr) if thr else 85
-            except Exception:
-                fuzzy_threshold = 85
+    # consensus settings: CLI/config override; otherwise interactive default
+    do_consensus = _get('consensus') if _get('consensus') is not None else None
+    if do_consensus is None and not args.no_interactive:
+        do_consensus = input("Compute consensus after runs? (y/n) [y]: ").strip().lower()
+        do_consensus = True if do_consensus in ('', 'y', 'yes') else False
+    else:
+        do_consensus = True if do_consensus in (True, 'y', 'yes', 'Y', '1') else False
+
+    consensus_mode = _get('consensus-mode') or 'exact'
+    fuzzy_threshold = _get('fuzzy-threshold') or 85
+    if do_consensus and consensus_mode == 'fuzzy' and not _get('fuzzy-threshold') and not args.no_interactive:
+        thr = input("Fuzzy threshold (0-100) [85]: ").strip()
+        try:
+            fuzzy_threshold = int(thr) if thr else 85
+        except Exception:
+            fuzzy_threshold = 85
 
     # delay between model runs (useful if switching models manually)
-    switch_delay = 0.0
-    if len(models_to_run) > 1:
+    switch_delay = _get('delay') if _get('delay') is not None else 0.0
+    if switch_delay is None:
+        switch_delay = 0.0
+    if len(models_to_run) > 1 and switch_delay == 0.0 and not args.no_interactive:
         delay_input = input("Enter delay between model runs in seconds (e.g., 1.0) or press Enter for 0: ").strip()
         switch_delay = float(delay_input) if delay_input else 0.0
 
@@ -400,51 +493,7 @@ def main():
             except Exception:
                 cpu_brand = platform.processor() or platform.machine() or 'Unknown CPU'
             ws.append([f"CPU: {cpu_brand}"])
-            # Detect GPUs where possible using a helper function for clarity and maintainability
-            def detect_gpus(cpu_brand):
-                """
-                Detects GPU information based on the current platform.
-                Returns a string describing integrated and detected GPUs.
-                """
-                gpu_info = None
-                integrated_gpu = None
-                # Check for integrated GPU by CPU brand
-                for brand in ["Radeon", "NVIDIA", "Intel Graphics", "Iris", "GeForce", "RTX", "GTX"]:
-                    if brand.lower() in cpu_brand.lower():
-                        integrated_gpu = cpu_brand
-                        break
-                try:
-                    if sys.platform.startswith('win'):
-                        # Windows: Use WMIC to get GPU names
-                        gpu_result = subprocess.run(['wmic', 'path', 'win32_VideoController', 'get', 'name'], capture_output=True, text=True)
-                        gpu_lines = gpu_result.stdout.splitlines()
-                        gpus = [line.strip() for line in gpu_lines if line.strip() and 'Name' not in line]
-                        gpu_info = ', '.join(gpus) if gpus else None
-                    elif sys.platform.startswith('linux'):
-                        # Linux: Use lspci to get VGA and 3D controller info
-                        gpu_result = subprocess.run('lspci | grep -i vga', shell=True, capture_output=True, text=True)
-                        gpus = [line for line in gpu_result.stdout.splitlines() if line]
-                        gpu_info = ', '.join(gpus) if gpus else None
-                        gpu_result_3d = subprocess.run('lspci | grep -i 3d', shell=True, capture_output=True, text=True)
-                        gpus_3d = [line for line in gpu_result_3d.stdout.splitlines() if line]
-                        if gpus_3d:
-                            gpu_info = gpu_info + ', ' + ', '.join(gpus_3d) if gpu_info else ', '.join(gpus_3d)
-                    elif sys.platform == 'darwin':
-                        # macOS: Use system_profiler to get GPU info
-                        gpu_result = subprocess.run(['system_profiler', 'SPDisplaysDataType', '-detailLevel', 'mini'], capture_output=True, text=True)
-                        gpus = [line.strip() for line in gpu_result.stdout.splitlines() if 'Chipset Model:' in line or 'Vendor:' in line]
-                        gpu_info = ', '.join(gpus) or None
-                except Exception:
-                    gpu_info = None
-                all_gpus = []
-                if integrated_gpu:
-                    all_gpus.append(f"Integrated GPU: {integrated_gpu}")
-                if gpu_info:
-                    all_gpus.append(f"Detected GPU(s): {gpu_info}")
-                return ', '.join(all_gpus) if all_gpus else 'Not detected'
-
             gpu_report = detect_gpus(cpu_brand)
-            ws.append([f"GPU: {gpu_report}"])
             ws.append([f"GPU: {gpu_report}"])
 
             wb.save(outpath)
@@ -457,6 +506,48 @@ def main():
         print(f"Reporting/aggregation error: {e}")
         traceback.print_exc()
 
+
+def detect_gpus(cpu_brand):
+    """
+    Detects GPU information based on the current platform.
+    Returns a string describing integrated and detected GPUs.
+    """
+    gpu_info = None
+    integrated_gpu = None
+    # Check for integrated GPU by CPU brand
+    for brand in ["Radeon", "NVIDIA", "Intel Graphics", "Iris", "GeForce", "RTX", "GTX"]:
+        if brand.lower() in cpu_brand.lower():
+            integrated_gpu = cpu_brand
+            break
+    try:
+        if sys.platform.startswith('win'):
+            # Windows: Use WMIC to get GPU names
+            gpu_result = subprocess.run(['wmic', 'path', 'win32_VideoController', 'get', 'name'], capture_output=True, text=True)
+            gpu_lines = gpu_result.stdout.splitlines()
+            gpus = [line.strip() for line in gpu_lines if line.strip() and 'Name' not in line]
+            gpu_info = ', '.join(gpus) if gpus else None
+        elif sys.platform.startswith('linux'):
+            # Linux: Use lspci to get VGA and 3D controller info
+            gpu_result = subprocess.run('lspci | grep -i vga', shell=True, capture_output=True, text=True)
+            gpus = [line for line in gpu_result.stdout.splitlines() if line]
+            gpu_info = ', '.join(gpus) if gpus else None
+            gpu_result_3d = subprocess.run('lspci | grep -i 3d', shell=True, capture_output=True, text=True)
+            gpus_3d = [line for line in gpu_result_3d.stdout.splitlines() if line]
+            if gpus_3d:
+                gpu_info = gpu_info + ', ' + ', '.join(gpus_3d) if gpu_info else ', '.join(gpus_3d)
+        elif sys.platform == 'darwin':
+            # macOS: Use system_profiler to get GPU info
+            gpu_result = subprocess.run(['system_profiler', 'SPDisplaysDataType', '-detailLevel', 'mini'], capture_output=True, text=True)
+            gpus = [line.strip() for line in gpu_result.stdout.splitlines() if 'Chipset Model:' in line or 'Vendor:' in line]
+            gpu_info = ', '.join(gpus) or None
+    except Exception:
+        gpu_info = None
+    all_gpus = []
+    if integrated_gpu:
+        all_gpus.append(f"Integrated GPU: {integrated_gpu}")
+    if gpu_info:
+        all_gpus.append(f"Detected GPU(s): {gpu_info}")
+    return ', '.join(all_gpus) if all_gpus else 'Not detected'
 
 if __name__ == '__main__':
     main()
