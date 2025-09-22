@@ -50,25 +50,25 @@ def main():
     multi = input("Do you want to compare multiple models? (y/n): ").strip().lower() == 'y'
     models_to_run = []
     if multi:
-        print("Enter model names to compare separated by commas, or press Enter to use discovered/suggested models:")
+        print("Enter model names to compare separated by commas, or press Enter to use suggested models:")
         m_input = input().strip()
         if not m_input:
             if models:
                 models_to_run = models
             else:
-                models_to_run = suggested or ['gemma3:12b']
+                models_to_run = suggested or ['gemma3:12b', 'gpt-oss:20b']
         else:
             models_to_run = [m.strip() for m in m_input.split(',') if m.strip()]
     else:
-        single = input('Enter a single model to use (or press Enter for gemma3:12b): ').strip()
-        single_model = single or 'gemma3:12b'
+        single = input('Enter a single model to use (or press Enter for gemma2): ').strip()
+        single_model = single or 'gemma2'
         if models and single_model not in models:
             print(f"Warning: '{single_model}' not found in ollama list; proceeding with provided name.")
         models_to_run = [single_model]
 
-    prompt_desc = input('What should the model identify? ').strip() or 'the main topic'
-    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Return only the identified item(s).'
-
+    prompt_desc = input('Enter what you want the model or models to identify within the text').strip() or 'the main topic'
+    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text.Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helptful. The text is:'
+    
     data_in = input('Data input folder [.] : ').strip() or '.'
     data_out = input('Data output folder [.] : ').strip() or '.'
 
@@ -90,8 +90,7 @@ def main():
 
     contents = df[content_col].tolist()
 
-    # --- Multi-model comparison adapted from image_analysis.py ---
-
+  
     # Consensus selection
     do_consensus = input("Compute consensus after runs? (y/n) [y]: ").strip().lower()
     do_consensus = True if do_consensus in ('', 'y', 'yes') else False
