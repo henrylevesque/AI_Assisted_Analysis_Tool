@@ -290,4 +290,23 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 
 If you use this software (or parts of it) in a publication, please cite this project. The canonical citation information is included in the repository's `CITATION.cff` file — please use that metadata (authors, title, version, DOI) when referencing this work.
 
+### Example citations
 
+Using the metadata in `CITATION.cff`, here are two example citation formats you can copy:
+
+- APA:
+
+    Levesque, H. (2025). AI_Assisted_Analysis_Tool (version 1.2-beta) [Software]. Zenodo. https://doi.org/10.5281/zenodo.14932653
+
+- BibTeX:
+
+    ```bibtex
+    @software{levesque_ai_2025,
+        author = {Levesque, Henry},
+        title = {AI_Assisted_Analysis_Tool},
+        year = {2025},
+        version = {1.2-beta},
+        doi = {10.5281/zenodo.14932653},
+        url = {https://github.com/hleve/AI_Analysis_Tool}
+    }
+    ```
