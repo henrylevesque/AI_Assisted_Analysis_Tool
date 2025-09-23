@@ -348,6 +348,6 @@ Using the metadata in `CITATION.cff`, here are two example citation formats you 
         year = {2025},
         version = {1.2-beta},
         doi = {10.5281/zenodo.14932653},
-        url = {https://github.com/hleve/AI_Analysis_Tool}
+        url = {https://github.com/henrylevesque/AI_Analysis_Tool}
     }
     ```
