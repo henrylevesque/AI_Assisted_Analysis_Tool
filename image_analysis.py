@@ -17,8 +17,13 @@ except Exception:
 
 
 def list_image_files(folder):
+    """
+    List image files in the given folder with supported extensions.
+
+    Returns a stable, sorted list of unique image filenames.
+    """
     exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp')
-    files = [f for f in os.listdir(folder) if f.lower().endswith(exts)]
+    files = [f for f in os.listdir(folder) if f.lower().endswith(exts) and os.path.isfile(os.path.join(folder, f))]
     # return a stable, sorted list with duplicates removed
     seen = set()
     out = []
@@ -28,8 +33,11 @@ def list_image_files(folder):
             out.append(f)
     return out
 
-
-def load_config(path: str):
+def load_config(path):
+    """
+    Load a JSON or YAML configuration file from path and return the parsed dict.
+    Returns an empty dict if path is falsy. Raises FileNotFoundError if the file does not exist.
+    """
     if not path:
         return {}
     if not os.path.exists(path):
@@ -198,15 +206,26 @@ def main():
     parser.add_argument('--input', help='Input folder path')
     parser.add_argument('--output', help='Output folder path')
     parser.add_argument('--runs', type=int, help='Number of runs per image')
-    # consensus flags: mutually exclusive group; default None means "don't override config"
-    grp = parser.add_mutually_exclusive_group()
-    grp.add_argument('--consensus', dest='consensus', action='store_true', help='Force consensus on')
-    grp.add_argument('--no-consensus', dest='consensus', action='store_false', help='Force consensus off')
-    parser.set_defaults(consensus=None)
-    parser.add_argument('--consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Consensus mode')
-    parser.add_argument('--fuzzy-threshold', type=int, help='Fuzzy threshold (0-100)')
+    # Consensus flags (within-model and between-model terminology)
+    grp_wm = parser.add_mutually_exclusive_group()
+    grp_wm.add_argument('--within-model-consensus', dest='within_model_consensus', action='store_true', help='Force within-model consensus on')
+    grp_wm.add_argument('--no-within-model-consensus', dest='within_model_consensus', action='store_false', help='Force within-model consensus off')
+    parser.set_defaults(within_model_consensus=None)
+    parser.add_argument('--within-model-consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Within-model consensus mode')
+    parser.add_argument('--within-model-fuzzy-threshold', type=int, help='Within-model fuzzy threshold (0-100)')
+
+    grp_bm = parser.add_mutually_exclusive_group()
+    grp_bm.add_argument('--between-model-consensus', dest='between_model_consensus', action='store_true', help='Force between-model consensus on')
+    grp_bm.add_argument('--no-between-model-consensus', dest='between_model_consensus', action='store_false', help='Force between-model consensus off')
+    parser.set_defaults(between_model_consensus=None)
+    parser.add_argument('--between-model-consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Between-model consensus mode')
+    parser.add_argument('--between-model-fuzzy-threshold', type=int, help='Between-model fuzzy threshold (0-100)')
     parser.add_argument('--delay', type=float, help='Delay between model runs in seconds')
     parser.add_argument('--type-of-analysis', help='What to identify in images (objects, scene, text)')
+    # Metadata appending to Excel output (tri-state)
+    parser.add_argument('--append-metadata', dest='append_metadata', action='store_true', help='Append metadata to Excel output')
+    parser.add_argument('--no-append-metadata', dest='append_metadata', action='store_false', help='Do not append metadata to Excel output')
+    parser.set_defaults(append_metadata=None)
     parser.add_argument('--no-interactive', action='store_true', help='Run non-interactively (require args/config for prompts)')
     args = parser.parse_args()
 
@@ -274,28 +293,55 @@ def main():
         else:
             models_to_run = suggested
 
-    # Consensus selection
-    do_consensus = _get('consensus') if _get('consensus') is not None else None
-    if do_consensus is None and not args.no_interactive:
-        do_consensus = input("Compute consensus after runs? (y/n) [y]: ").strip().lower()
-        do_consensus = True if do_consensus in ('', 'y', 'yes') else False
+    # Within-model consensus selection
+    within_model = _get('within-model-consensus') if _get('within-model-consensus') is not None else None
+    if within_model is None:
+        if not args.no_interactive:
+            ans = input("Compute within-model consensus after runs? (y/n) [y]: ").strip().lower()
+            within_model = True if ans in ('', 'y', 'yes') else False
+        else:
+            within_model = True
     else:
-        do_consensus = True if do_consensus in (True, 'y', 'yes', 'Y', '1') else False
+        within_model = True if within_model in (True, 'y', 'yes', 'Y', '1') else False
 
-    # Determine consensus mode: prefer CLI/config, otherwise prompt the user when they opt into consensus
-    consensus_mode = _get('consensus-mode') if _get('consensus-mode') is not None else None
-    fuzzy_threshold = _get('fuzzy-threshold') or 85
-    if do_consensus and consensus_mode is None and not args.no_interactive:
-        cm = input("Consensus mode to use for per-model consensus (exact/set/fuzzy) [exact]: ").strip().lower()
-        consensus_mode = cm or 'exact'
-    consensus_mode = consensus_mode or 'exact'
+    within_model_mode = _get('within-model-consensus-mode') if _get('within-model-consensus-mode') is not None else None
+    within_model_fuzzy_threshold = _get('within-model-fuzzy-threshold') or 85
+    if within_model and within_model_mode is None and not args.no_interactive:
+        cm = input("Within-model consensus mode (exact/set/fuzzy) [exact]: ").strip().lower()
+        within_model_mode = cm or 'exact'
+    within_model_mode = within_model_mode or 'exact'
 
-    if do_consensus and consensus_mode == 'fuzzy' and not _get('fuzzy-threshold') and not args.no_interactive:
-        thr = input("Fuzzy threshold (0-100) [85]: ").strip()
+    if within_model and within_model_mode == 'fuzzy' and not _get('within-model-fuzzy-threshold') and not args.no_interactive:
+        thr = input("Within-model fuzzy threshold (0-100) [85]: ").strip()
         try:
-            fuzzy_threshold = int(thr) if thr else 85
+            within_model_fuzzy_threshold = int(thr) if thr else 85
         except Exception:
-            fuzzy_threshold = 85
+            within_model_fuzzy_threshold = 85
+
+    # Between-model consensus selection
+    between_model = _get('between-model-consensus') if _get('between-model-consensus') is not None else None
+    between_model_mode = _get('between-model-consensus-mode') if _get('between-model-consensus-mode') is not None else None
+    between_model_fuzzy_threshold = _get('between-model-fuzzy-threshold') or within_model_fuzzy_threshold
+
+    if between_model is None:
+        if not args.no_interactive:
+            ans = input("Compute between-model consensus after runs? (y/n) [y]: ").strip().lower()
+            between_model = True if ans in ('', 'y', 'yes') else False
+        else:
+            between_model = True
+    else:
+        between_model = True if between_model in (True, 'y', 'yes', 'Y', '1') else False
+
+    between_model_mode = between_model_mode or within_model_mode
+    between_model_fuzzy_threshold = between_model_fuzzy_threshold or within_model_fuzzy_threshold
+
+    # Append metadata decision (tri-state: CLI/config overrides prompt unless --no-interactive is False)
+    append_metadata = _get('append-metadata') if _get('append-metadata') is not None else None
+    if append_metadata is None and not args.no_interactive:
+        ans = input("Append metadata/reporting to the output Excel file? (Y/n) [Y]: ").strip().lower()
+        append_metadata = True if ans in ('', 'y', 'yes') else False
+    else:
+        append_metadata = True if append_metadata in (True, 'y', 'yes', '1') else False
 
     # Prompt / analysis instruction
     type_of_analysis = _get('type-of-analysis') or None
@@ -357,10 +403,10 @@ def main():
         # merge responses into master_df by Image
         master_df = master_df.merge(model_df, on='Image', how='left')
 
-        # compute consensus for this model block if requested
-        if do_consensus and response_cols:
+        # compute within-model consensus for this model block if requested
+        if within_model and response_cols:
             block_cols = [renamed[c] for c in response_cols]
-            consensus, confidences = compute_consensus_for_block(master_df, block_cols, mode=consensus_mode, fuzzy_threshold=fuzzy_threshold)
+            consensus, confidences = compute_consensus_for_block(master_df, block_cols, mode=within_model_mode, fuzzy_threshold=within_model_fuzzy_threshold)
             master_df[f"Consensus ({model})"] = consensus
             master_df[f"Consensus_Confidence ({model})"] = confidences
 
@@ -392,10 +438,10 @@ def main():
         ws.append(["Models used:", ', '.join(metadata_models)])
         ws.append([f"Runs per image: {num_runs}"])
         ws.append([f"Delay between model runs: {switch_delay} seconds"])
-        ws.append([f"Consensus enabled: {do_consensus}"])
-        ws.append([f"Consensus mode: {consensus_mode}"])
-        if consensus_mode == 'fuzzy':
-            ws.append([f"Fuzzy threshold: {fuzzy_threshold}"])
+        ws.append([f"Within-model consensus enabled: {within_model}"])
+        ws.append([f"Within-model consensus mode: {within_model_mode}"])
+        if within_model_mode == 'fuzzy':
+            ws.append([f"Within-model fuzzy threshold: {within_model_fuzzy_threshold}"])
         hours, rem = divmod(analysis_duration, 3600)
         minutes, seconds = divmod(rem, 60)
         ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
@@ -415,16 +461,10 @@ def main():
 
         aggregated = False
         agg_summary = {}
-        run_aggregation = input("Do you want to aggregate AI responses for consensus across the output file? (y/n): ").strip().lower()
-        if run_aggregation == 'y' and df_report is not None:
-            agg_mode = input(f"Aggregated consensus mode (exact/set/fuzzy) [{consensus_mode}]: ").strip().lower() or consensus_mode
-            agg_fuzzy_thr = fuzzy_threshold
-            if agg_mode == 'fuzzy':
-                thr_in = input(f"Aggregated fuzzy threshold (0-100) [{fuzzy_threshold}]: ").strip()
-                try:
-                    agg_fuzzy_thr = int(thr_in) if thr_in else fuzzy_threshold
-                except Exception:
-                    agg_fuzzy_thr = fuzzy_threshold
+        # Use pre-run between-model consensus selection
+        if between_model and df_report is not None:
+            agg_mode = between_model_mode
+            agg_fuzzy_thr = between_model_fuzzy_threshold
 
             response_cols = [col for col in df_report.columns if col.lower().startswith('response')]
             print(f"\nFound {len(response_cols)} response columns. Calculating aggregated consensus using mode={agg_mode}...")
@@ -452,32 +492,30 @@ def main():
                 except Exception as e:
                     print(f"Could not write aggregated consensus to {output_file_path}: {e}")
 
-            # Cross-model consensus when multiple models are present
-            cross_model_done = False
-            if len(metadata_models) > 1:
-                cross_choice = input("Run cross-model consensus across per-model Consensus columns? (y/n): ").strip().lower() == 'y'
-                if cross_choice:
-                    per_model_cons_cols = [f"Consensus ({m})" for m in metadata_models if f"Consensus ({m})" in df_report.columns]
-                    if not per_model_cons_cols:
-                        per_model_cons_cols = [c for c in df_report.columns if c.lower().startswith('consensus (')]
-                    if per_model_cons_cols:
-                        print(f"Running cross-model consensus on columns: {per_model_cons_cols}")
-                        try:
-                            cross_cons, cross_conf = compute_consensus_for_block(df_report, per_model_cons_cols, mode=agg_mode, fuzzy_threshold=agg_fuzzy_thr)
-                            df_report['CrossModel_Consensus'] = cross_cons
-                            df_report['CrossModel_Consensus_Confidence'] = cross_conf
-                            cross_model_done = True
-                            print("Cross-model consensus computed and added to the output file.")
-                        except Exception as e:
-                            print(f"Cross-model consensus failed: {e}")
-                    else:
-                        print("No per-model consensus columns found for cross-model aggregation.")
-                    if cross_model_done:
-                        try:
-                            df_report.to_excel(output_file_path, index=False)
-                            print(f"Cross-model consensus saved to {output_file_path}")
-                        except Exception as e:
-                            print(f"Could not save cross-model consensus to {output_file_path}: {e}")
+            # Between-model consensus when multiple models are present
+            between_model_done = False
+            if between_model and len(metadata_models) > 1:
+                within_model_cons_cols = [f"Consensus ({m})" for m in metadata_models if f"Consensus ({m})" in df_report.columns]
+                if not within_model_cons_cols:
+                    within_model_cons_cols = [c for c in df_report.columns if c.lower().startswith('consensus (')]
+                if within_model_cons_cols:
+                    print(f"Running between-model consensus on columns: {within_model_cons_cols}")
+                    try:
+                        between_cons, between_conf = compute_consensus_for_block(df_report, within_model_cons_cols, mode=agg_mode, fuzzy_threshold=agg_fuzzy_thr)
+                        df_report['BetweenModel_Consensus'] = between_cons
+                        df_report['BetweenModel_Consensus_Confidence'] = between_conf
+                        between_model_done = True
+                        print("Between-model consensus computed and added to the output file.")
+                    except Exception as e:
+                        print(f"Between-model consensus failed: {e}")
+                else:
+                    print("No within-model consensus columns found for between-model aggregation.")
+                if between_model_done:
+                    try:
+                        df_report.to_excel(output_file_path, index=False)
+                        print(f"Between-model consensus saved to {output_file_path}")
+                    except Exception as e:
+                        print(f"Could not save between-model consensus to {output_file_path}: {e}")
 
         # Append final reporting metadata (including aggregated summary if any)
         try:
@@ -489,10 +527,14 @@ def main():
             ws.append(["Models used:", ', '.join(metadata_models)])
             ws.append([f"Runs per image: {num_runs}"])
             ws.append([f"Delay between model runs: {switch_delay} seconds"])
-            ws.append([f"Consensus enabled during runs: {do_consensus}"])
-            ws.append([f"Consensus mode (per-model): {consensus_mode}"])
-            if consensus_mode == 'fuzzy':
-                ws.append([f"Fuzzy threshold (per-model): {fuzzy_threshold}"])
+            ws.append([f"Within-model consensus enabled during runs: {within_model}"])
+            ws.append([f"Within-model consensus mode: {within_model_mode}"])
+            if within_model_mode == 'fuzzy':
+                ws.append([f"Within-model fuzzy threshold: {within_model_fuzzy_threshold}"])
+            ws.append([f"Between-model consensus enabled: {between_model}"])
+            ws.append([f"Between-model consensus mode: {between_model_mode}"])
+            if between_model_mode == 'fuzzy':
+                ws.append([f"Between-model fuzzy threshold: {between_model_fuzzy_threshold}"])
             hours, rem = divmod(analysis_duration, 3600)
             minutes, seconds = divmod(rem, 60)
             ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])

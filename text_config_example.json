@@ -1,5 +1,5 @@
 {
-  "_notes": "Example JSON config for text_analysis.py. Use 'use_multiple_models' to control single vs multiple model runs.",
+  "_notes": "Example JSON config for text_analysis.py (updated: within/between-model consensus naming).",
   "use_multiple_models": false,
   "models": ["gemma3:12b"],
   "prompt_desc": "Main topic to extract from each row's content. Can be a short instruction or pointer to a full prompt template.",
@@ -7,9 +7,13 @@
   "output": "./data/text_output/abstracts_results.xlsx",
   "id_col": "id",
   "content_col": "abstract",
-  "runs": 3,
-  "consensus": true,
-  "consensus_mode": "fuzzy",
-  "fuzzy_threshold": 85,
-  "delay": 0.0
+  "runs": 10,
+  "within_model_consensus": true,
+  "within_model_consensus_mode": "fuzzy",
+  "within_model_fuzzy_threshold": 85,
+  "between_model_consensus": false,
+  "between_model_consensus_mode": "exact",
+  "between_model_fuzzy_threshold": 85,
+  "delay": 0.0,
+  "append_metadata": true
 }
