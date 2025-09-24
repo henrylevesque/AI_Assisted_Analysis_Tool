@@ -2,12 +2,14 @@
 
 ## Introduction
 
-AI Assisted Analysis Tool is an open-source, locally-run toolkit for AI-assisted text and image analysis based on Ollama. It supports three main workflows (text, image, Zotero abstracts) and is designed for reproducible, researcher-friendly analyses. See the Project Goals, License, and Citation sections for more details: [Project Goals](#project-goals) · [License](#license) · [Citation](#citation).
+AI Assisted Analysis Tool is an open-source, locally-run toolkit for AI-assisted text and image analysis based on Ollama. It supports three main workflows (text, image, Zotero abstracts) and is designed for reproducible, researcher-friendly analyses. The code allows researchers to run large text based datasets, image datasets, or abstracts exported from Zotero, and run flexible AI enabled analysis on each item. The code logic supports using any LLM from Ollama, and uses a strategy of multiple runs of each item through the LLM that are then consolidated through three main consensus modes to give the modal response across runs to account for LLM errors or hallucinations, with a confidence score based on the percentage of modal responces to total responses. The code optionally supports running through multiple LLM models on the same dataset and allows comparison and consensus calculation within and between models.
+
+See the License and Citation sections for more details: [License](#license) · [Citation](#citation).
 
 Key points:
 - Supported inputs: Excel, CSV, image folders, and Zotero exports.
 - Configuration: analysis scripts accept YAML or JSON config files (e.g., configs/text_analysis.yaml or configs/image_analysis.json).
-- Command-line usage: scripts also accept standard CLI arguments (example flags: --config, --model, --runs, --consensus, --output). Command-line arguments override config file values.
+- Command-line usage: scripts also accept standard CLI arguments (example flags: --config, --models, --runs, --within-model-consensus, --between-model-consensus, --output). Command-line arguments override config file values.
 - Defaults and precedence: built-in defaults → config file → explicit CLI arguments.
 
 Quick examples:
@@ -63,8 +65,8 @@ See the usage sections for each workflow for full lists of accepted config keys 
 
 **Key Features:**
 - Run one or more vision models sequentially to avoid constant context switching
-- Run multiple replicates per image and record per-model Response_1..N
-- Compute per-model Consensus and Consensus_Confidence using modes: `exact`, `set`, or `fuzzy`
+- Run multiple replicates per image and record within-model Response_1..N
+- Compute within-model Consensus and Consensus_Confidence using modes: `exact`, `set`, or `fuzzy`
 - Fuzzy consensus uses `rapidfuzz` to cluster similar responses (install `rapidfuzz` to enable)
 - Progress bars (tqdm) and an optional inter-model `switch_delay` to allow operator/model switching
 - Output is an Excel file with a metadata sheet containing prompt, model(s), runs, duration, and environment info
@@ -292,7 +294,7 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
             Provide all required settings on the command line and include `--no-interactive` to prevent prompts. CLI arguments override values in any config file. Example:
 
             ```powershell
-            python image_analysis.py --models "gemma3:12b" --input "./images" --output "results.xlsx" --runs 2 --consensus --consensus-mode fuzzy --fuzzy-threshold 85 --no-interactive
+            python image_analysis.py --models "gemma3:12b" --input "./images" --output "results.xlsx" --runs 2 --within-model-consensus --within-model-consensus-mode fuzzy --within-model-fuzzy-threshold 85 --no-interactive
             ```
 
         - Config-file driven (JSON or YAML) with optional CLI overrides:
@@ -305,15 +307,15 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
             python text_analysis.py --config configs/text_config_example.yaml --runs 1 --no-interactive
             ```
             
-            ### Boolean flags: --consensus / --no-consensus
+            ### Boolean flags: within-model / between-model consensus and append-metadata
 
-            The scripts use mutually-exclusive on/off flags for important boolean options so that the absence of a flag does not accidentally override a value in your config file. For example, the consensus setting is tri-state:
+            The scripts use mutually-exclusive on/off flags for important boolean options so that the absence of a flag does not accidentally override a value in your config file. The relevant tri-state flags are:
 
-            - If you pass `--consensus`, consensus is enabled for this run.
-            - If you pass `--no-consensus`, consensus is disabled for this run.
-            - If you omit both flags, the script will defer to the value found in your config file (or fall back to the script default if the config doesn't specify it).
-
-            This pattern preserves the precedence rule (CLI overrides config) while allowing "no-op" CLI runs that don't overwrite config values unintentionally.
+            - Within-model consensus: `--within-model-consensus` / `--no-within-model-consensus` (defaults to ON when not specified)
++            - Between-model consensus: `--between-model-consensus` / `--no-between-model-consensus` (defaults to ON when not specified)
++            - Append metadata: `--append-metadata` / `--no-append-metadata` (defaults to ON when not specified)
++
+            Specifying the `--within-model-consensus` flag forces within-model consensus on for the run; `--no-within-model-consensus` forces it off. Omitting both will use the config file value or the script default.
 
 3. **Follow any additional prompts or instructions** provided by the script to complete the analysis.
 

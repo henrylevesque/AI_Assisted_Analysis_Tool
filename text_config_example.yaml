@@ -1,8 +1,27 @@
 # Example YAML config for text_analysis.py
-# Use 'use_multiple_models' to control single vs multiple model runs.
-# YAML supports comments, so this file is easier for humans to edit.
 
-_notes: "Example YAML config for text_analysis.py. Provide models as an array."
+# Notes for config fields:
+# use_multiple_models: Boolean. If true, every model listed in 'models' will be run sequentially and per-model outputs recorded.
+#   If false, only the first model in the 'models' array will be used.
+# models: Array of model names (strings). Example: ['gemma3:12b', 'gemma2'].
+#   Include model identifiers and optional size/version as appropriate.
+# prompt_desc: Short description or instruction passed to the model. Can be a concise instruction or a pointer to a full prompt template.
+#   This can be overridden via CLI when running the script.
+# input: Path to the input file (Excel or CSV) containing rows to analyze (e.g., ./data/text_input/abstracts.xlsx).
+# output: Path to the output Excel file where results and metadata will be written (e.g., ./data/text_output/abstracts_results.xlsx).
+# id_col: Name of the column in the input file that uniquely identifies each row (e.g., "id").
+# content_col: Name of the column that contains the text to analyze (e.g., "abstract").
+# runs: Integer. Number of replicate runs per input row to capture model variability. Use 1 for a single run. Adjust runs and consensus settings to balance reproducibility and runtime.
+# consensus: Boolean. Whether to compute a consensus value across replicate runs for each row.
+# consensus_mode: One of 'exact', 'set', or 'fuzzy'. Controls how consensus is determined:
+#   - exact: responses must match exactly.
+#   - set: treat responses as unordered sets of tokens/labels (order-independent comparison).
+#   - fuzzy: group responses by similarity using fuzzy matching.
+# fuzzy_threshold: Integer 0-100. Controls sensitivity for fuzzy grouping (higher = stricter/more similar required).
+#   Only used when consensus_mode is 'fuzzy'.
+# delay: Float. Seconds to wait between switching models when running multiple models sequentially. Use 0.0 for no delay.
+
+
 use_multiple_models: false
 models:
   - gemma3:12b
@@ -11,20 +30,11 @@ input: "./data/text_input/abstracts.xlsx"
 output: "./data/text_output/abstracts_results.xlsx"
 id_col: "id"
 content_col: "abstract"
-runs: 3
-consensus: true
-consensus_mode: fuzzy
-fuzzy_threshold: 85
+runs: 10
+within_model_consensus: true
+within_model_consensus_mode: fuzzy
+within_model_fuzzy_threshold: 85
+between_model_consensus: false
+between_model_consensus_mode: exact
+between_model_fuzzy_threshold: 85
 delay: 0.0
-
-_field_descriptions:
-  use_multiple_models: "Boolean. If true, every model listed in 'models' will be run sequentially and per-model outputs recorded. If false, only the first model in the 'models' array will be used."
-  models: "Array of model names (strings). Example: ['gemma3:12b', 'gemma2']"
-  prompt_desc: "Short description or instruction passed to the model. Override via CLI if needed."
-  input: "Path to input Excel/CSV file for the text workflow."
-  output: "Output Excel file where results and metadata will be written."
-  runs: "Integer: number of replicate runs per input row to capture variability."
-  consensus: "Boolean: whether to compute a consensus value per model."
-  consensus_mode: "One of 'exact', 'set', or 'fuzzy'. See README for differences."
-  fuzzy_threshold: "Integer 0-100 controlling fuzzy grouping sensitivity (higher = stricter)."
-  delay: "Seconds to wait between switching models when running multiple models sequentially."

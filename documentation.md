@@ -223,7 +223,8 @@ graph TD
    - Error handling and logging for failed AI requests
 
 3. **Consensus Calculation**
-   - Word frequency analysis across all responses
+   - Word frequency analysis across all responses (within-model consensus is computed per model across replicate runs)
+   - Optionally compute between-model consensus across models' within-model consensus columns when multiple models were used
    - Confidence scoring based on agreement levels
    - Fallback to most common full response if no word consensus
 

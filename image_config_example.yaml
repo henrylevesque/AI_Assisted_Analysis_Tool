@@ -21,14 +21,19 @@
 #   Only used when consensus_mode is 'fuzzy'.
 # delay: Float. Seconds to wait between switching models when running multiple models sequentially. Use 0.0 for no delay.
 
-use_multiple_models: false
+use_multiple_models: true
 models:
   - gemma3:12b
+  - llava:13b
+  - llama3.2-vision:11b
 type_of_analysis: objects
 input: "./data/images"
 output: "./data/image_output/results.xlsx"
-runs: 2
-consensus: true
-consensus_mode: exact
-fuzzy_threshold: 85
+runs: 10
+within_model_consensus: true
+within_model_consensus_mode: fuzzy
+within_model_fuzzy_threshold: 85
+between_model_consensus: false
+between_model_consensus_mode: exact
+between_model_fuzzy_threshold: 85
 delay: 0.5

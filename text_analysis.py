@@ -66,14 +66,28 @@ def main():
     parser.add_argument('--id-col', help='Identifier column name')
     parser.add_argument('--content-col', help='Content column name')
     parser.add_argument('--runs', type=int, help='Number of runs per row')
-    # consensus flags: mutually exclusive. default None means "don't override config"
-    grp = parser.add_mutually_exclusive_group()
-    grp.add_argument('--consensus', dest='consensus', action='store_true', help='Force consensus on')
-    grp.add_argument('--no-consensus', dest='consensus', action='store_false', help='Force consensus off')
-    parser.set_defaults(consensus=None)
-    parser.add_argument('--consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Consensus mode')
-    parser.add_argument('--fuzzy-threshold', type=int, help='Fuzzy threshold (0-100)')
+    # Consensus flags (within-model and between-model terminology)
+    grp_wm = parser.add_mutually_exclusive_group()
+    grp_wm.add_argument('--within-model-consensus', dest='within_model_consensus', action='store_true', help='Force within-model consensus on')
+    grp_wm.add_argument('--no-within-model-consensus', dest='within_model_consensus', action='store_false', help='Force within-model consensus off')
+    parser.set_defaults(within_model_consensus=None)
+    parser.add_argument('--within-model-consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Within-model consensus mode')
+    parser.add_argument('--within-model-fuzzy-threshold', type=int, help='Within-model fuzzy threshold (0-100)')
+
+    grp_bm = parser.add_mutually_exclusive_group()
+    grp_bm.add_argument('--between-model-consensus', dest='between_model_consensus', action='store_true', help='Force between-model consensus on')
+    grp_bm.add_argument('--no-between-model-consensus', dest='between_model_consensus', action='store_false', help='Force between-model consensus off')
+    parser.set_defaults(between_model_consensus=None)
+    parser.add_argument('--between-model-consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Between-model consensus mode')
+    parser.add_argument('--between-model-fuzzy-threshold', type=int, help='Between-model fuzzy threshold (0-100)')
     parser.add_argument('--delay', type=float, help='Delay between model runs in seconds')
+    # (legacy per-model/cross-model parser options removed) Use within-model / between-model flags instead above
+
+    # Append metadata tri-state
+    grp_meta = parser.add_mutually_exclusive_group()
+    grp_meta.add_argument('--append-metadata', dest='append_metadata', action='store_true', help='Append metadata to output workbook')
+    grp_meta.add_argument('--no-append-metadata', dest='append_metadata', action='store_false', help='Do not append metadata to output workbook')
+    parser.set_defaults(append_metadata=None)
     parser.add_argument('--no-interactive', action='store_true', help='Run non-interactively (require args/config for prompts)')
     args = parser.parse_args()
 
@@ -86,6 +100,15 @@ def main():
             if args.no_interactive:
                 raise
             cfg = {}
+
+    # If a config file was provided in interactive mode, confirm before silently using it
+    if args.config and not args.no_interactive:
+        try:
+            use_cfg = input(f"Load configuration from {args.config}? (y/n) [y]: ").strip().lower()
+            if use_cfg not in ('', 'y', 'yes'):
+                cfg = {}
+        except Exception:
+            pass
 
     def _get(key, default=None):
         val = getattr(args, key.replace('-', '_'), None)
@@ -186,23 +209,58 @@ def main():
     contents = df[content_col].tolist()
 
   
-    # Consensus selection
-    # consensus settings: CLI/config override; otherwise interactive default
-    do_consensus = _get('consensus') if _get('consensus') is not None else None
-    if do_consensus is None and not args.no_interactive:
-        do_consensus = input("Compute consensus after runs? (y/n) [y]: ").strip().lower()
-        do_consensus = True if do_consensus in ('', 'y', 'yes') else False
+    # Pre-run consensus and metadata choices (collect before long runs so non-interactive runs can proceed)
+    # Within-model consensus decision (tri-state via CLI/config). Default = True.
+    within_model = _get('within_model_consensus') if _get('within_model_consensus') is not None else None
+    if within_model is None:
+        if args.no_interactive:
+            within_model = True
+        else:
+            resp = input("Compute within-model consensus after runs? (y/n) [y]: ").strip().lower()
+            within_model = True if resp in ('', 'y', 'yes') else False
     else:
-        do_consensus = True if do_consensus in (True, 'y', 'yes', 'Y', '1') else False
+        within_model = True if within_model in (True, 'y', 'yes', 'Y', '1') else False
 
-    consensus_mode = _get('consensus-mode') or 'exact'
-    fuzzy_threshold = _get('fuzzy-threshold') or 85
-    if do_consensus and consensus_mode == 'fuzzy' and not _get('fuzzy-threshold') and not args.no_interactive:
-        thr = input("Fuzzy threshold (0-100) [85]: ").strip()
+    within_model_mode = _get('within-model-consensus-mode') or 'exact'
+    within_model_fuzzy = _get('within-model-fuzzy-threshold') or 85
+    if within_model and within_model_mode == 'fuzzy' and not _get('within-model-fuzzy-threshold') and not args.no_interactive:
+        thr = input("Within-model fuzzy threshold (0-100) [85]: ").strip()
         try:
-            fuzzy_threshold = int(thr) if thr else 85
+            within_model_fuzzy = int(thr) if thr else 85
         except Exception:
-            fuzzy_threshold = 85
+            within_model_fuzzy = 85
+
+    # Aggregated (across response columns) decision
+    aggregated_choice = _get('aggregate') if _get('aggregate') is not None else None
+    if aggregated_choice is None:
+        if args.no_interactive:
+            aggregated_choice = False
+        else:
+            agg_resp = input("Do you want to aggregate AI responses for consensus across the output file? (y/n) [n]: ").strip().lower()
+            aggregated_choice = True if agg_resp in ('y', 'yes') else False
+    else:
+        aggregated_choice = True if aggregated_choice in (True, 'y', 'yes', 'Y', '1') else False
+
+    # Between-model consensus decision (tri-state). Default = True.
+    between_model = _get('between_model_consensus') if _get('between_model_consensus') is not None else None
+    if between_model is None:
+        if args.no_interactive:
+            between_model = True
+        else:
+            bm_resp = input("Compute between-model consensus across per-model Consensus columns? (y/n) [y]: ").strip().lower()
+            between_model = True if bm_resp in ('', 'y', 'yes') else False
+    else:
+        between_model = True if between_model in (True, 'y', 'yes', 'Y', '1') else False
+
+    between_model_mode = _get('between-model-consensus-mode') or within_model_mode
+    between_model_fuzzy = _get('between-model-fuzzy-threshold') or within_model_fuzzy
+
+    # Append metadata to the workbook (default True)
+    append_metadata = _get('append_metadata') if _get('append_metadata') is not None else None
+    if append_metadata is None:
+        append_metadata = True
+    else:
+        append_metadata = True if append_metadata in (True, 'y', 'yes', 'Y', '1') else False
 
     # delay between model runs (useful if switching models manually)
     switch_delay = _get('delay') if _get('delay') is not None else 0.0
@@ -340,6 +398,10 @@ def main():
         rows = run_model_on_texts(model, contents, prompt_template, num_runs, ids)
         model_df = pd.DataFrame(rows)
 
+        # Defensive: drop duplicate Identifier rows from model output before merging to avoid merge multiplication
+        if 'Identifier' in model_df.columns:
+            model_df = model_df.drop_duplicates(subset=['Identifier'])
+
         # rename response columns to include model name
         response_cols = [c for c in model_df.columns if c.lower().startswith('response')]
         renamed = {c: f"{c} ({model})" for c in response_cols}
@@ -348,10 +410,10 @@ def main():
         # merge responses into master_df by Identifier
         master_df = master_df.merge(model_df, on='Identifier', how='left')
 
-        # compute consensus for this model block if requested
-        if do_consensus and response_cols:
+        # compute consensus for this model block if requested (use within-model pre-run choice)
+        if within_model and response_cols:
             block_cols = [renamed[c] for c in response_cols]
-            consensus, confidences = compute_consensus_for_block(master_df, block_cols, mode=consensus_mode, fuzzy_threshold=fuzzy_threshold)
+            consensus, confidences = compute_consensus_for_block(master_df, block_cols, mode=within_model_mode, fuzzy_threshold=within_model_fuzzy)
             master_df[f"Consensus ({model})"] = consensus
             master_df[f"Consensus_Confidence ({model})"] = confidences
 
@@ -373,7 +435,7 @@ def main():
     analysis_duration = analysis_end - analysis_start
     print(f"\nCombined analysis complete. Results saved to {outpath}")
 
-    # Consolidated reporting: optional aggregation + metadata append
+    # Consolidated reporting: optional aggregation + metadata append using pre-run choices
     try:
         # Load dataframe from the saved output file so aggregation and reporting operate on the final sheet
         try:
@@ -385,17 +447,18 @@ def main():
         # Optionally run an overall aggregation across response columns (post-hoc)
         aggregated = False
         agg_summary = {}
-        run_aggregation = input("Do you want to aggregate AI responses for consensus across the output file? (y/n): ").strip().lower()
-        if run_aggregation == 'y' and df_report is not None:
-            # let the user choose aggregated consensus mode (default to per-model mode)
-            agg_mode = input(f"Aggregated consensus mode (exact/set/fuzzy) [{consensus_mode}]: ").strip().lower() or consensus_mode
-            agg_fuzzy_thr = fuzzy_threshold
-            if agg_mode == 'fuzzy':
-                thr_in = input(f"Aggregated fuzzy threshold (0-100) [{fuzzy_threshold}]: ").strip()
+        if aggregated_choice and df_report is not None:
+            # Determine aggregated mode (default to within-model mode)
+            agg_mode = within_model_mode
+            if not args.no_interactive:
+                agg_mode = input(f"Aggregated consensus mode (exact/set/fuzzy) [{agg_mode}]: ").strip().lower() or agg_mode
+            agg_fuzzy_thr = within_model_fuzzy
+            if agg_mode == 'fuzzy' and not args.no_interactive:
+                thr_in = input(f"Aggregated fuzzy threshold (0-100) [{agg_fuzzy_thr}]: ").strip()
                 try:
-                    agg_fuzzy_thr = int(thr_in) if thr_in else fuzzy_threshold
+                    agg_fuzzy_thr = int(thr_in) if thr_in else agg_fuzzy_thr
                 except Exception:
-                    agg_fuzzy_thr = fuzzy_threshold
+                    pass
 
             response_cols = [col for col in df_report.columns if re.match(r'^response_\d+', col.lower())]
             print(f"\nFound {len(response_cols)} response columns. Calculating aggregated consensus using mode={agg_mode}...")
@@ -427,35 +490,33 @@ def main():
                 except Exception as e:
                     print(f"Could not write aggregated consensus to {outpath}: {e}")
 
-            # If multiple models were used, optionally compute cross-model consensus across per-model Consensus columns
-            cross_model_done = False
-            if len(metadata_models) > 1:
-                cross_choice = input("Run cross-model consensus across per-model Consensus columns? (y/n): ").strip().lower() == 'y'
-                if cross_choice:
-                    # build per-model consensus column list (only include those present)
-                    per_model_cons_cols = [f"Consensus ({m})" for m in metadata_models if f"Consensus ({m})" in df_report.columns]
-                    if not per_model_cons_cols:
-                        # fallback: try any column that starts with 'consensus ('
-                        per_model_cons_cols = [c for c in df_report.columns if c.lower().startswith('consensus (')]
-                    if per_model_cons_cols:
-                        print(f"Running cross-model consensus on columns: {per_model_cons_cols}")
-                        try:
-                            cross_cons, cross_conf = compute_consensus_for_block(df_report, per_model_cons_cols, mode=agg_mode, fuzzy_threshold=agg_fuzzy_thr)
-                            df_report['CrossModel_Consensus'] = cross_cons
-                            df_report['CrossModel_Consensus_Confidence'] = cross_conf
-                            cross_model_done = True
-                            print("Cross-model consensus computed and added to the output file.")
-                        except Exception as e:
-                            print(f"Cross-model consensus failed: {e}")
-                    else:
-                        print("No per-model consensus columns found for cross-model aggregation.")
-                    # save after cross-model consensus if added
-                    if cross_model_done:
-                        try:
-                            df_report.to_excel(outpath, index=False)
-                            print(f"Cross-model consensus saved to {outpath}")
-                        except Exception as e:
-                            print(f"Could not save cross-model consensus to {outpath}: {e}")
+            # If multiple models were used, optionally compute between-model consensus across within-model Consensus columns
+            between_model_done = False
+            if between_model and len(metadata_models) > 1:
+                # build within-model consensus column list (only include those present)
+                within_model_cons_cols = [f"Consensus ({m})" for m in metadata_models if f"Consensus ({m})" in df_report.columns]
+                if not within_model_cons_cols:
+                    # fallback: try any column that starts with 'consensus ('
+                    within_model_cons_cols = [c for c in df_report.columns if c.lower().startswith('consensus (')]
+                if within_model_cons_cols:
+                    print(f"Running between-model consensus on columns: {within_model_cons_cols}")
+                    try:
+                        between_cons, between_conf = compute_consensus_for_block(df_report, within_model_cons_cols, mode=between_model_mode, fuzzy_threshold=between_model_fuzzy)
+                        df_report['BetweenModel_Consensus'] = between_cons
+                        df_report['BetweenModel_Consensus_Confidence'] = between_conf
+                        between_model_done = True
+                        print("Between-model consensus computed and added to the output file.")
+                    except Exception as e:
+                        print(f"Between-model consensus failed: {e}")
+                else:
+                    print("No within-model consensus columns found for between-model aggregation.")
+                # save after between-model consensus if added
+                if between_model_done:
+                    try:
+                        df_report.to_excel(outpath, index=False)
+                        print(f"Between-model consensus saved to {outpath}")
+                    except Exception as e:
+                        print(f"Could not save between-model consensus to {outpath}: {e}")
 
         # Build reporting metadata and append to the bottom of the workbook
         try:
@@ -467,10 +528,10 @@ def main():
             ws.append(["Models used:", ', '.join(metadata_models)])
             ws.append([f"Runs per row: {num_runs}"])
             ws.append([f"Delay between model runs: {switch_delay} seconds"])
-            ws.append([f"Consensus enabled during runs: {do_consensus}"])
-            ws.append([f"Consensus mode (per-model): {consensus_mode}"])
-            if consensus_mode == 'fuzzy':
-                ws.append([f"Fuzzy threshold (per-model): {fuzzy_threshold}"])
+            ws.append([f"Within-model consensus enabled during runs: {within_model}"])
+            ws.append([f"Within-model consensus mode: {within_model_mode}"])
+            if within_model_mode == 'fuzzy':
+                ws.append([f"Within-model fuzzy threshold: {within_model_fuzzy}"])
             hours, rem = divmod(analysis_duration, 3600)
             minutes, seconds = divmod(rem, 60)
             ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
