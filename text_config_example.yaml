@@ -38,3 +38,4 @@ between_model_consensus: false
 between_model_consensus_mode: exact
 between_model_fuzzy_threshold: 85
 delay: 0.0
+append_metadata: true

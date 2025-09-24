@@ -33,7 +33,8 @@ runs: 10
 within_model_consensus: true
 within_model_consensus_mode: fuzzy
 within_model_fuzzy_threshold: 85
-between_model_consensus: false
+between_model_consensus: true
 between_model_consensus_mode: exact
 between_model_fuzzy_threshold: 85
 delay: 0.5
+append_metadata: true
