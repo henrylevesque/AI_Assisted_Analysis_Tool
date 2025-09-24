@@ -18,7 +18,15 @@ except Exception:
 
 def list_image_files(folder):
     exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp')
-    return [f for f in os.listdir(folder) if f.lower().endswith(exts)]
+    files = [f for f in os.listdir(folder) if f.lower().endswith(exts)]
+    # return a stable, sorted list with duplicates removed
+    seen = set()
+    out = []
+    for f in sorted(files):
+        if f not in seen:
+            seen.add(f)
+            out.append(f)
+    return out
 
 
 def load_config(path: str):
@@ -204,12 +212,24 @@ def main():
 
     cfg = {}
     if args.config:
-        try:
-            cfg = load_config(args.config) or {}
-        except Exception as e:
-            print(f"Could not load config {args.config}: {e}")
-            if args.no_interactive:
-                raise
+        # If user supplied a config file but did not request fully non-interactive mode,
+        # confirm they want to use the config. This prevents accidentally loading a YAML
+        # when the user expects interactive prompts.
+        use_cfg = True
+        if not args.no_interactive:
+            ans = input(f"Config file provided: {args.config}. Use this config and skip interactive prompts? (y/N): ").strip().lower()
+            use_cfg = True if ans in ('y', 'yes') else False
+
+        if use_cfg:
+            try:
+                cfg = load_config(args.config) or {}
+            except Exception as e:
+                print(f"Could not load config {args.config}: {e}")
+                if args.no_interactive:
+                    raise
+                cfg = {}
+        else:
+            print("Ignoring provided config and running interactively.")
             cfg = {}
 
     def _get(key, default=None):
@@ -262,8 +282,14 @@ def main():
     else:
         do_consensus = True if do_consensus in (True, 'y', 'yes', 'Y', '1') else False
 
-    consensus_mode = _get('consensus-mode') or 'exact'
+    # Determine consensus mode: prefer CLI/config, otherwise prompt the user when they opt into consensus
+    consensus_mode = _get('consensus-mode') if _get('consensus-mode') is not None else None
     fuzzy_threshold = _get('fuzzy-threshold') or 85
+    if do_consensus and consensus_mode is None and not args.no_interactive:
+        cm = input("Consensus mode to use for per-model consensus (exact/set/fuzzy) [exact]: ").strip().lower()
+        consensus_mode = cm or 'exact'
+    consensus_mode = consensus_mode or 'exact'
+
     if do_consensus and consensus_mode == 'fuzzy' and not _get('fuzzy-threshold') and not args.no_interactive:
         thr = input("Fuzzy threshold (0-100) [85]: ").strip()
         try:
