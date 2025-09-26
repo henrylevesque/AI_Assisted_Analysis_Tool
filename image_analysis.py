@@ -252,10 +252,19 @@ def main():
             cfg = {}
 
     def _get(key, default=None):
+        # Prefer CLI-provided values (argparse normalizes hyphens to underscores)
         val = getattr(args, key.replace('-', '_'), None)
         if val is not None:
             return val
-        return cfg.get(key, default)
+
+        # Accept either hyphenated or underscored keys in the config file so
+        # users can write either `within-model-consensus` or `within_model_consensus`.
+        if key in cfg:
+            return cfg.get(key)
+        alt = key.replace('-', '_')
+        if alt in cfg:
+            return cfg.get(alt)
+        return default
 
     # discover models
     try:
