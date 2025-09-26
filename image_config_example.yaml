@@ -23,18 +23,26 @@
 
 use_multiple_models: true
 models:
-  - gemma3:12b
-  - llava:13b
-  - llama3.2-vision:11b
-type_of_analysis: objects
-input: "./data/images"
-output: "./data/image_output/results.xlsx"
+  - 'gemma3:12b'
+  - 'llava:13b'
+  - 'llama3.2-vision:11b'
+
+# short human-readable description of what to extract
+prompt_desc: "three criteria for evaluating the design in the image"
+
+# Windows paths should be quoted to avoid YAML escape issues
+input: 'C:\\Users\\leves\\OneDrive - University of Cincinnati\\LLM images for analysis\\Input with all images'
+output: 'C:\\Users\\leves\\OneDrive - University of Cincinnati\\LLM images for analysis\\output with all images'
+
 runs: 10
-within_model_consensus: true
-within_model_consensus_mode: fuzzy
-within_model_fuzzy_threshold: 85
-between_model_consensus: true
-between_model_consensus_mode: exact
-between_model_fuzzy_threshold: 85
+
+within-model-consensus: true
+within-model-consensus-mode: fuzzy
+within-model-fuzzy-threshold: 85
+
+between-model-consensus: true
+between-model-consensus-mode: fuzzy
+between-model-fuzzy-threshold: 85
+
 delay: 0.5
-append_metadata: true
+append-metadata: true
