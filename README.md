@@ -186,6 +186,7 @@ The following scripts in `python_for_Zotero_abstracts` are designed for specific
        - Optionally append all reporting info to the bottom of the output Excel file
     5. Review your results in the output Excel file (includes consensus columns and reporting info if selected)
 
+
     ## 2. Analysis Workflow — Image
 
     **Purpose:** Analyze images using local vision-capable models and compare responses across models.
@@ -224,6 +225,64 @@ The following scripts in `python_for_Zotero_abstracts` are designed for specific
       ```
     - PowerShell users: run the commands above in an activated virtual environment to ensure packages are available.
 
+**Terminal Command Flowchart**
+    
+ ```mermaid
+graph LR
+    A --> B
+    B --> C1
+    C1 --> C
+    C --> D
+    D --> D1
+    D1 --> E
+    E --> E1
+    E1 --> F
+    F --> F1
+    F1 --> G
+    G --> H
+    H --> I
+    I --> J
+
+
+    subgraph "LLM Models"
+            C1[Gemma2]
+            C2(Llama3.2)
+            C3(Qwen3)
+    end
+
+
+    subgraph "Consensus Type"
+            D1(Exact)
+            D2(Set)
+            D3(Fuzzy)
+            D4(Fuzzy Threshold)
+    end
+
+    subgraph "Data Source"
+            E1(Input Folder)
+            E2(Output Folder)
+    end
+
+    subgraph "Metadata"
+            F1(Prompt)
+            F2(LLM Used)
+            F3(System Specifications CPU and GPU)
+            F4(Number of Runs)
+            F5(Rows with low, medium, and high confidence)
+            F6(Duration of Analysis)
+    end
+
+    A(Start)
+    B(Display System LLM Models)
+    C(Select LLM Models)
+    D(Select Consensus type)
+    E(Input Data Source)
+    F(Select Metadata)
+    G(Select Number of Runs)
+    H(Run through all data n times)
+    I(Calculate Consensus)
+    J(Export to Excel File)
+ ```
 
 2. **Run the desired Python file**:
         ```sh
