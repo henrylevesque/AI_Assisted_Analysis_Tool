@@ -40,36 +40,6 @@ See the License and Citation sections for more details: [License](#license) · [
 
 See the usage sections for each workflow for full lists of accepted config keys and CLI flags (Text Analysis, Image Analysis, Zotero Abstracts). For reporting, outputs include Excel files with optional embedded metadata and a metadata sheet documenting prompt, model, runs, duration, and environment.
 
-## 1. Analysis Workflow - Text
-
-**Purpose:** Analyze any tabular data (Excel or CSV) using AI, not limited to abstracts. This workflow is flexible and user-friendly, allowing you to select which columns to analyze and how the results are reported.
-
-**Key Features:**
-- Works with any Excel or CSV file (not just abstracts)
-- Lists all columns and lets you select identifier and content columns by name
-- Lets you define what you want the AI to identify in your data (custom prompt)
-- Allows you to set the number of analysis runs for each row
-- Optionally aggregates AI responses for consensus and confidence
-- Optionally appends all reporting info (prompt, LLM, runs, hardware, consensus summary, etc.) to the bottom of the Excel output file
-- Enhanced reporting: includes prompt, LLM used, number of runs, analysis duration, CPU/GPU info
-- Cross-platform: Windows, macOS, Linux
-
-**How to Use:**
-1. Prepare your Excel or CSV file and place it in your chosen data input folder.
-2. Make sure you also have a data output folder for your file to be saved in after the analysis.
-3. Run the script:
-    ```powershell
-    python text_analysis.py
-    ```
-4. Follow the prompts:
-   - Select the AI model (or press Enter for the recommended model)
-   - Enter what you want the program to identify in your data (custom prompt)
-   - Choose columns for identifier and content by name
-   - Set the number of runs for analysis
-   - Optionally aggregate AI responses for consensus and confidence
-   - Optionally append all reporting info to the bottom of the output Excel file
-5. Review your results in the output Excel file (includes consensus columns and reporting info if selected)
-
 
 ## Process flowchart
 
