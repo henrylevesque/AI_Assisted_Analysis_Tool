@@ -8,9 +8,9 @@ See the License and Citation sections for more details: [License](#license) · [
 
 Key points:
 - Supported inputs: Excel, CSV, image folders, and Zotero exports.
-- Configuration: analysis scripts accept YAML or JSON config files (e.g., configs/text_analysis.yaml or configs/image_analysis.json).
 - Command-line usage: scripts also accept standard CLI arguments (example flags: --config, --models, --runs, --within-model-consensus, --between-model-consensus, --output). Command-line arguments override config file values.
 - Defaults and precedence: built-in defaults → config file → explicit CLI arguments.
+- Configuration: analysis scripts accept YAML or JSON config files (e.g., configs/text_analysis.yaml or configs/image_analysis.json).
 
 Quick examples:
 - Use a YAML config:
