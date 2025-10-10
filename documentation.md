@@ -37,6 +37,7 @@ This document provides detailed technical information about the AI Assisted Anal
 8. [Troubleshooting](#troubleshooting)
 
 ## Model Selection and Performance
+Gemma families of LLMs have been shown to respond best to the prompt structure, Gemma2 or Gemma3 are best for text, and Gemma3 in a 12B varient are able to work well with images.
 
 ### Model Evaluation Process
 The model selection process involved testing several LLMs available through Ollama:
@@ -358,9 +359,3 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 - **Integrated Workflow**: New `custom_analysis_with_aggregation.py`
 - **Enhanced Consensus**: Improved algorithm with better confidence scoring
 - **Documentation**: Comprehensive technical documentation added
-
-### Future Enhancements
-- Support for additional file formats (JSON, CSV with custom delimiters)
-- Web interface for easier configuration
-- Batch processing across multiple files
-- Custom consensus algorithms
