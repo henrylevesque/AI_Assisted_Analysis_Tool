@@ -359,3 +359,7 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 - **Integrated Workflow**: New `custom_analysis_with_aggregation.py`
 - **Enhanced Consensus**: Improved algorithm with better confidence scoring
 - **Documentation**: Comprehensive technical documentation added
+
+## Reporting Analysis in Excel/Spreadsheet software
+- You can report number of words/numbers by using an H stack to create a count that you can then visualize with a bar chart.
+   - =SORT(HSTACK(UNIQUE(A2:A100), COUNTIF(A2:A100, UNIQUE(A2:A100))), 2,-1)
