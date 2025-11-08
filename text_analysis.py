@@ -81,6 +81,10 @@ def main():
     parser.add_argument('--between-model-consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Between-model consensus mode')
     parser.add_argument('--between-model-fuzzy-threshold', type=int, help='Between-model fuzzy threshold (0-100)')
     parser.add_argument('--delay', type=float, help='Delay between model runs in seconds')
+    # Aggregation flag: aggregate AI responses for consensus across the output file
+    parser.add_argument('--aggregate', dest='aggregate', action='store_true', help='Aggregate AI responses for consensus across the output file')
+    parser.add_argument('--no-aggregate', dest='aggregate', action='store_false', help='Do not aggregate AI responses for consensus across the output file')
+    parser.set_defaults(aggregate=None)
     # (legacy per-model/cross-model parser options removed) Use within-model / between-model flags instead above
 
     # Append metadata tri-state
@@ -121,7 +125,6 @@ def main():
         if key_underscore in cfg:
             return cfg[key_underscore]
         return default
-        return cfg.get(key, default)
 
 
     # Try to list available Ollama models to help the user choose
@@ -167,17 +170,33 @@ def main():
 
     data_in = _get('input') or (input('Data input folder [.] : ').strip() if not args.no_interactive else '.')
     data_out = _get('output') or (input('Data output folder [.] : ').strip() if not args.no_interactive else '.')
-    if args.no_interactive:
+    # Ensure prompt_desc is always defined (may come from CLI/config)
+    prompt_desc = _get('prompt_desc') or _get('prompt-desc') or None
+    # Interactive prompt for description (only when interactive allowed)
+    if not args.no_interactive:
         if data_in == '.':
             print("Warning: Using current directory ('.') as input folder. Specify --input to override.")
         if data_out == '.':
             print("Warning: Using current directory ('.') as output folder. Specify --output to override.")
-        prompt_desc = input('Enter what you want the model or models to identify within the text: ').strip() or 'the main topic'
+        # If user provides an input here, prefer it; otherwise keep any config/CLI-provided value
+        resp_desc = input('Enter what you want the model or models to identify within the text: ').strip()
+        if resp_desc:
+            prompt_desc = resp_desc
     prompt_desc = prompt_desc or 'the main topic'
+    
+    # Clean up input/output paths in case they were provided with surrounding quotes
+    def _clean_path(p: str):
+        if p is None:
+            return p
+        p = str(p).strip()
+        # remove surrounding quotes if present
+        if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
+            p = p[1:-1].strip()
+        return p
+    data_in = _clean_path(data_in)
+    data_out = _clean_path(data_out)
     prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helptful. The text is:'
-
-    data_in = _get('input') or (input('Data input folder [.] : ').strip() if not args.no_interactive else '.')
-    data_out = _get('output') or (input('Data output folder [.] : ').strip() if not args.no_interactive else '.')
+    # Do not re-prompt for output folder here (already collected above).
 
     f = list_input_file(data_in)
     if not f:
@@ -198,14 +217,40 @@ def main():
             num_runs = num_runs or cfg.get('runs') or 1
         else:
             id_col, content_col, num_runs = get_user_columns(df)
-    if id_col and id_col in df.columns:
-        ids = df[id_col].tolist()
+
+    # Resolve column names case-insensitively so users can input non-exact casing
+    def _resolve_col_name(name):
+        if not name:
+            return None
+        # direct match first
+        if name in df.columns:
+            return name
+        # case-insensitive exact match
+        exact_ci = [c for c in df.columns if c.lower() == name.lower()]
+        if exact_ci:
+            if len(exact_ci) > 1:
+                print(f"Warning: multiple columns match '{name}' case-insensitively. Using '{exact_ci[0]}'.")
+            return exact_ci[0]
+        # startswith match (case-insensitive)
+        starts = [c for c in df.columns if c.lower().startswith(name.lower())]
+        if starts:
+            print(f"Using column '{starts[0]}' for requested '{name}' (case-insensitive startswith).")
+            return starts[0]
+        return None
+
+    resolved_id = _resolve_col_name(id_col)
+    resolved_content = _resolve_col_name(content_col)
+
+    if resolved_id:
+        ids = df[resolved_id].tolist()
     else:
         ids = list(range(1, len(df) + 1))
-    if content_col not in df.columns:
-        print('Content column not found. Exiting.')
-        return
 
+    if not resolved_content:
+        print(f"Content column '{content_col}' not found (case-insensitive). Available columns: {list(df.columns)}. Exiting.")
+        return
+    # use resolved column name for subsequent operations
+    content_col = resolved_content
     contents = df[content_col].tolist()
 
   
@@ -214,10 +259,15 @@ def main():
     within_model = _get('within_model_consensus') if _get('within_model_consensus') is not None else None
     if within_model is None:
         if args.no_interactive:
+            # In non-interactive mode keep prior default (True)
             within_model = True
         else:
-            resp = input("Compute within-model consensus after runs? (y/n) [y]: ").strip().lower()
-            within_model = True if resp in ('', 'y', 'yes') else False
+            # If only one model is being used, do not prompt the user and do not run within-model consensus
+            if len(models_to_run) == 1:
+                within_model = False
+            else:
+                resp = input("Compute within-model consensus after runs? (y/n) [y]: ").strip().lower()
+                within_model = True if resp in ('', 'y', 'yes') else False
     else:
         within_model = True if within_model in (True, 'y', 'yes', 'Y', '1') else False
 
@@ -247,13 +297,45 @@ def main():
         if args.no_interactive:
             between_model = True
         else:
-            bm_resp = input("Compute between-model consensus across per-model Consensus columns? (y/n) [y]: ").strip().lower()
-            between_model = True if bm_resp in ('', 'y', 'yes') else False
+            # If only one model is selected, skip between-model consensus prompt and default to False
+            if len(models_to_run) <= 1:
+                between_model = False
+            else:
+                bm_resp = input("Compute between-model consensus across per-model Consensus columns? (y/n) [y]: ").strip().lower()
+                between_model = True if bm_resp in ('', 'y', 'yes') else False
     else:
         between_model = True if between_model in (True, 'y', 'yes', 'Y', '1') else False
 
     between_model_mode = _get('between-model-consensus-mode') or within_model_mode
     between_model_fuzzy = _get('between-model-fuzzy-threshold') or within_model_fuzzy
+
+    # If aggregation or between-model consensus will be used, ask user for modes and thresholds now
+    agg_mode = within_model_mode
+    agg_fuzzy_thr = within_model_fuzzy
+    if aggregated_choice:
+        # allow override via config/CLI
+        agg_mode = _get('aggregated_consensus_mode') or _get('aggregate_consensus_mode') or agg_mode
+        agg_fuzzy_thr = _get('aggregated_fuzzy_threshold') or _get('aggregate_fuzzy_threshold') or agg_fuzzy_thr
+        if not args.no_interactive:
+            agg_mode = input(f"Aggregated consensus mode (exact/set/fuzzy) [{agg_mode}]: ").strip().lower() or agg_mode
+            if agg_mode == 'fuzzy':
+                thr_in = input(f"Aggregated fuzzy threshold (0-100) [{agg_fuzzy_thr}]: ").strip()
+                try:
+                    agg_fuzzy_thr = int(thr_in) if thr_in else agg_fuzzy_thr
+                except Exception:
+                    pass
+
+    # Between-model mode/threshold: ask now if applicable
+    between_model_mode = _get('between-model-consensus-mode') or within_model_mode
+    between_model_fuzzy = _get('between-model-fuzzy-threshold') or within_model_fuzzy
+    if between_model and len(models_to_run) > 1 and not args.no_interactive:
+        between_model_mode = input(f"Between-model consensus mode (exact/set/fuzzy) [{between_model_mode}]: ").strip().lower() or between_model_mode
+        if between_model_mode == 'fuzzy':
+            thr_b = input(f"Between-model fuzzy threshold (0-100) [{between_model_fuzzy}]: ").strip()
+            try:
+                between_model_fuzzy = int(thr_b) if thr_b else between_model_fuzzy
+            except Exception:
+                pass
 
     # Append metadata to the workbook (default True)
     append_metadata = _get('append_metadata') if _get('append_metadata') is not None else None
@@ -426,6 +508,18 @@ def main():
     base = os.path.splitext(f)[0]
     outname = f"{base}_text_analysis_{num_runs}runs_multi.xlsx" if len(models_to_run) > 1 else f"{base}_text_analysis_{num_runs}runs.xlsx"
     outpath = os.path.join(data_out, outname)
+    # Ensure output directory is cleaned and exists (robust against quoted input)
+    try:
+        data_out = _clean_path(data_out)
+    except Exception:
+        data_out = data_out
+    outpath = os.path.join(data_out, outname)
+    if not os.path.isdir(data_out):
+        try:
+            os.makedirs(data_out, exist_ok=True)
+            print(f"Created output directory: {data_out}")
+        except Exception as e:
+            print(f"Warning: could not create output directory {data_out}: {e}. Will attempt to write to it and may fail.")
     try:
         master_df = reorder_columns_posthoc(master_df, models_to_run, num_runs)
     except Exception as e:
@@ -448,18 +542,7 @@ def main():
         aggregated = False
         agg_summary = {}
         if aggregated_choice and df_report is not None:
-            # Determine aggregated mode (default to within-model mode)
-            agg_mode = within_model_mode
-            if not args.no_interactive:
-                agg_mode = input(f"Aggregated consensus mode (exact/set/fuzzy) [{agg_mode}]: ").strip().lower() or agg_mode
-            agg_fuzzy_thr = within_model_fuzzy
-            if agg_mode == 'fuzzy' and not args.no_interactive:
-                thr_in = input(f"Aggregated fuzzy threshold (0-100) [{agg_fuzzy_thr}]: ").strip()
-                try:
-                    agg_fuzzy_thr = int(thr_in) if thr_in else agg_fuzzy_thr
-                except Exception:
-                    pass
-
+            # Use aggregated mode and threshold chosen prior to analysis
             response_cols = [col for col in df_report.columns if re.match(r'^response_\d+', col.lower())]
             print(f"\nFound {len(response_cols)} response columns. Calculating aggregated consensus using mode={agg_mode}...")
 
@@ -548,7 +631,11 @@ def main():
                     for idx, row in agg_summary.get('low_rows').iterrows():
                         id_display = row.get('Identifier', idx + 1)
                         conf_col = 'Aggregated_Consensus_Confidence' if 'Aggregated_Consensus_Confidence' in row else 'Consensus_Confidence'
-                        ws.append([f"Row {idx + 1}: {id_display} (confidence: {row[conf_col]:.1%})"])
+                        try:
+                            conf_val = row[conf_col]
+                            ws.append([f"Row {idx + 1}: {id_display} (confidence: {conf_val:.1%})"])
+                        except Exception:
+                            ws.append([f"Row {idx + 1}: {id_display} (confidence: unknown)"])
 
             # CPU/GPU info
             try:
@@ -575,7 +662,13 @@ def main():
 def detect_gpus(cpu_brand):
     """
     Detects GPU information based on the current platform.
+
     Returns a string describing integrated and detected GPUs.
+
+    Note:
+        - On Windows, uses WMIC; on Linux, uses lspci; on macOS, uses system_profiler.
+        - May return 'Not detected' if no GPU is found or if required system commands are unavailable.
+        - Exceptions may occur if subprocess calls fail or required utilities are missing.
     """
     gpu_info = None
     integrated_gpu = None
