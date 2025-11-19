@@ -1,26 +1,10 @@
-
 # AI Assisted Analysis Tool - Technical Documentation
 
+## Executive Summary
+This document provides technical reference material for developers and researchers using the AI Assisted Analysis Tool. It covers architecture, model selection rationale, data management, the consensus algorithm, and troubleshooting. For a quick start (clone, install, run) and user-oriented overview, see README.md.
+
 ## Getting Started
-
-1. **Clone the repository**
-   ```powershell
-   git clone https://github.com/hleve/AI_Assisted_Analysis_Tool.git
-   ```
-
-2. **Install dependencies**
-   ```powershell
-   pip install -r requirements.txt
-   ```
-
-3. **Run the main script**
-   ```powershell
-   python ai_assisted_analysis.py
-   ```
-
-4. **Explore analysis modules**
-   - `other_analysis/ai_response_aggregation.py`: Aggregates AI responses
-   - `python_for_Zotero_abstracts/`: Contains thematic and methodological analysis scripts
+For a short quick-start guide (clone, install, run), see README.md. This document is focused on implementation details, configuration, and internal workflows.
 
 ---
 
@@ -37,18 +21,28 @@ This document provides detailed technical information about the AI Assisted Anal
 8. [Troubleshooting](#troubleshooting)
 
 ## Model Selection and Performance
-Gemma families of LLMs have been shown to respond best to the prompt structure, Gemma2 or Gemma3 are best for text, and Gemma3 in a 12B varient are able to work well with images.
+The Gemma family of LLMs responds well to the project's prompt structure. Gemma2 and Gemma3 are recommended for text analysis; Gemma3 (12B variant) performs well with images.
 
 ### Model Evaluation Process
-The model selection process involved testing several LLMs available through Ollama:
+The model selection process involved testing several LLMs available through Ollama.
 
-- **TinyLlama**: Initially tested as the smallest available model, but produced inconsistent and unreliable results
-- **Llama3.3**: Provided high-quality outputs but was too resource-intensive and slow for batch processing
-- **Gemma2 (9B)**: Selected as the optimal balance between performance and efficiency
+- **TinyLlama**: Initially tested as the smallest available model but produced inconsistent and unreliable results.
+- **Llama3.3**: Provided high-quality outputs but was too resource-intensive and slow for batch processing.
+- **Gemma2 (9B)**: Selected as the default model for text analysis due to a balance of performance and efficiency.
   - Default quantization (9B parameters)
-  - Excellent instruction following
+  - Strong instruction following
   - Reasonable processing speed for bulk analysis
   - Consistent output quality
+- **Gemma3 (12B)**: Selected as the default model for image analysis because it balances vision capability and performance.
+  - Default quantization (12B parameters)
+  - Strong instruction following
+  - Reasonable processing speed for image analysis
+  - Consistent output quality
+
+#### Summary
+Gemma models tend to perform better than Llama models at following instructions and avoiding extraneous information for text analysis. GPT-OSS also performs well for text, but due to its size it runs slowly on CPU- or GPU-limited machines. For image analysis, Gemma models perform well; vision capability is generally available at larger parameter sizes (Gemma3). Llava and Llama vision models did not perform well in testing — they often produced irrelevant explanations or had difficulty parsing images.
+
+In general, using the smallest model that meets quality requirements yields the best performance trade-off. A 4-billion-parameter version of Gemma3 can give more consistent results with the project's prompt structure than larger models from other labs.
 
 ### Model Configuration
 ```python
@@ -64,7 +58,7 @@ response = chat(model="gemma2", messages=[
 ## Data Management Strategy
 
 ### Folder Structure
-The project uses a clean separation between code and data to enable sharing while protecting sensitive information:
+The project uses a clear separation between code and data to enable sharing while protecting sensitive information:
 
 ```
 AI_Assisted_Analysis_Tool/
@@ -76,29 +70,29 @@ AI_Assisted_Analysis_Tool/
 ```
 
 ### Data Privacy
-- **Local Processing**: All analysis runs locally using Ollama
-- **No Cloud Dependencies**: Data never leaves the local machine
-- **Institutional Compliance**: Designed for environments with strict data handling requirements
-- **Reproducible**: Code can be shared without exposing research data
+- **Local Processing**: All analysis runs locally using Ollama.
+- **No Cloud Dependencies**: Data does not leave the local machine.
+- **Institutional Compliance**: Designed for environments with strict data handling requirements.
+- **Reproducible**: Code can be shared without exposing research data.
 
 ## Project Architecture
 
 ### Core Components
 
 #### 1. Custom Analysis Engine (`custom_analysis.py`)
-- **Purpose**: Flexible analysis tool for any CSV/Excel data
-- **Features**: User-defined prompts, column selection, multiple runs per item
-- **Output**: Raw AI responses for each content item
+- **Purpose**: Flexible analysis tool for any CSV/Excel data.
+- **Features**: User-defined prompts, column selection, multiple runs per item.
+- **Output**: Raw AI responses for each content item.
 
 #### 2. Response Aggregation (`ai_response_aggregation.py`)
-- **Purpose**: Post-process multiple AI responses to find consensus
-- **Algorithm**: Word frequency analysis across responses
-- **Output**: Consensus results with confidence scoring
+- **Purpose**: Post-process multiple AI responses to find consensus.
+- **Algorithm**: Word frequency analysis across responses.
+- **Output**: Consensus results with confidence scoring.
 
 #### 3. Integrated Analysis (`custom_analysis_with_aggregation.py`)
-- **Purpose**: Combined workflow running analysis and aggregation in sequence
-- **Benefits**: Streamlined process, automatic consensus calculation
-- **Output**: Complete results with consensus and confidence metrics
+- **Purpose**: Combined workflow running analysis and aggregation in sequence.
+- **Benefits**: Streamlined process, automatic consensus calculation.
+- **Output**: Complete results with consensus and confidence metrics.
 
 #### 4. Zotero-Specific Tools
 Individual scripts for common bibliographic analysis tasks:
@@ -214,30 +208,30 @@ graph TD
 ### Process Flow Details
 
 1. **Data Ingestion**
-   - Automatically detect CSV or Excel files in `Data_Input/`
-   - Support for user-defined column mapping
-   - Flexible identifier column (auto-numbering or user-selected)
+   - Automatically detect CSV or Excel files in `Data_Input/`.
+   - Support for user-defined column mapping.
+   - Flexible identifier column (auto-numbering or user-selected).
 
 2. **Analysis Execution**
-   - Configurable number of runs per content item
-   - Progress tracking with `tqdm` progress bars
-   - Error handling and logging for failed AI requests
+   - Configurable number of runs per content item.
+   - Progress tracking with `tqdm` progress bars.
+   - Error handling and logging for failed AI requests.
 
 3. **Consensus Calculation**
-   - Word frequency analysis across all responses (within-model consensus is computed per model across replicate runs)
-   - Optionally compute between-model consensus across models' within-model consensus columns when multiple models were used
-   - Confidence scoring based on agreement levels
-   - Fallback to most common full response if no word consensus
+   - Word frequency analysis across all responses (within-model consensus is computed per model across replicate runs).
+   - Optionally compute between-model consensus across models' within-model consensus columns when multiple models are used.
+   - Confidence scoring based on agreement levels.
+   - Fallback to the most common full response if no word consensus.
 
 4. **Output Generation**
-   - Excel files with all original responses preserved
-   - Additional consensus columns with confidence metrics
-   - Summary statistics for quality assessment
+   - Excel files with all original responses preserved.
+   - Additional consensus columns with confidence metrics.
+   - Summary statistics for quality assessment.
 
 ## Consensus Algorithm
 
 ### Algorithm Overview
-The consensus mechanism employs a sophisticated word-frequency approach to identify agreement across multiple AI responses:
+The consensus mechanism uses a word-frequency approach to identify agreement across multiple AI responses.
 
 ### Step-by-Step Process
 
@@ -263,21 +257,21 @@ The consensus mechanism employs a sophisticated word-frequency approach to ident
    ```
 
 ### Confidence Levels
-- **High Confidence (≥70%)**: Strong agreement across responses
-- **Medium Confidence (40-69%)**: Moderate agreement, generally reliable
-- **Low Confidence (<40%)**: Poor agreement, requires manual review
+- **High Confidence (≥70%)**: Strong agreement across responses.
+- **Medium Confidence (40–69%)**: Moderate agreement; generally reliable.
+- **Low Confidence (<40%)**: Poor agreement; requires manual review.
 
 ### Edge Cases Handled
-- **Single Response**: Automatic confidence of 100%
-- **No Word Consensus**: Falls back to most frequent complete response
-- **Empty/Error Responses**: Handled gracefully with appropriate confidence scores
+- **Single Response**: Automatic confidence of 100%.
+- **No Word Consensus**: Falls back to the most frequent complete response.
+- **Empty/Error Responses**: Handled gracefully with appropriate confidence scores.
 
 ## File Structure
 
 ### Input Files
-- **CSV Format**: Standard comma-separated values
-- **Excel Format**: .xlsx files supported via `openpyxl`
-- **Column Flexibility**: Any column can serve as identifier or content
+- **CSV Format**: Standard comma-separated values.
+- **Excel Format**: .xlsx files supported via `openpyxl`.
+- **Column Flexibility**: Any column can serve as identifier or content.
 
 ### Output Files
 Standard naming convention: `{original_filename}_{analysis_type}_with_consensus.xlsx`
@@ -289,15 +283,15 @@ Standard naming convention: `{original_filename}_{analysis_type}_with_consensus.
 | `Content` | Original content that was analyzed |
 | `Response_1` to `Response_N` | Individual AI responses |
 | `Consensus_Result` | Agreed-upon result from consensus algorithm |
-| `Consensus_Confidence` | Numerical confidence score (0.0-1.0) |
+| `Consensus_Confidence` | Numerical confidence score (0.0–1.0) |
 
 ## Troubleshooting
 
 ### Common Issues and Solutions
 
 #### Import Errors
-**Problem**: `ModuleNotFoundError` for packages
-**Solution**: 
+**Problem**: `ModuleNotFoundError` for packages  
+**Solution**:
 ```bash
 # Ensure virtual environment is activated
 .\venv\Scripts\activate.bat
@@ -307,7 +301,7 @@ pip install -r requirements.txt
 ```
 
 #### Ollama Connection Issues
-**Problem**: Cannot connect to Ollama service
+**Problem**: Cannot connect to Ollama service  
 **Solution**:
 ```bash
 # Ensure Ollama is running
@@ -321,11 +315,11 @@ ollama pull gemma2
 ```
 
 #### Excel File Errors
-**Problem**: Cannot write Excel files
-**Solution**: Ensure `openpyxl` is installed for Excel support
+**Problem**: Cannot write Excel files  
+**Solution**: Ensure `openpyxl` is installed for Excel support.
 
 #### PowerShell Execution Policy (Windows)
-**Problem**: Cannot activate virtual environment
+**Problem**: Cannot activate virtual environment  
 **Solution**:
 ```powershell
 # Use batch file activation
@@ -338,28 +332,28 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 ### Performance Optimization
 
 #### Memory Management
-- Process large datasets in chunks if memory issues occur
-- Close Excel files before processing to avoid conflicts
+- Process large datasets in chunks if memory issues occur.
+- Close Excel files before processing to avoid conflicts.
 
 #### Speed Optimization
-- Use smaller models for faster processing (trade-off with quality)
-- Reduce number of runs per item for quicker results
-- Process subsets of data for testing before full runs
+- Use smaller models for faster processing (trade-off with quality).
+- Reduce number of runs per item for quicker results.
+- Process subsets of data for testing before full runs.
 
 ### Error Recovery
-- All errors are logged with row and run information
-- Failed responses are marked as "Error occurred"
-- Analysis continues even if individual queries fail
+- All errors are logged with row and run information.
+- Failed responses are marked as "Error occurred".
+- Analysis continues even if individual queries fail.
 
 ## Version History
 
 ### Recent Updates
-- **Package Dependencies**: Fixed `ollama_python` → `ollama` naming issue
-- **Excel Support**: Added `openpyxl` for robust Excel handling
-- **Integrated Workflow**: New `custom_analysis_with_aggregation.py`
-- **Enhanced Consensus**: Improved algorithm with better confidence scoring
-- **Documentation**: Comprehensive technical documentation added
+- **Package Dependencies**: Fixed `ollama_python` → `ollama` naming issue.
+- **Excel Support**: Added `openpyxl` for robust Excel handling.
+- **Integrated Workflow**: New `custom_analysis_with_aggregation.py`.
+- **Enhanced Consensus**: Improved algorithm with better confidence scoring.
+- **Documentation**: Comprehensive technical documentation added.
 
 ## Reporting Analysis in Excel/Spreadsheet software
-- You can report number of words/numbers by using an H stack to create a count that you can then visualize with a bar chart.
-   - =SORT(HSTACK(UNIQUE(A2:A100), COUNTIF(A2:A100, UNIQUE(A2:A100))), 2,-1)
+You can report number of words/numbers by using an H stack to create a count that you can then visualize with a bar chart.
+- =SORT(HSTACK(UNIQUE(A2:A100), COUNTIF(A2:A100, UNIQUE(A2:A100))), 2,-1)
