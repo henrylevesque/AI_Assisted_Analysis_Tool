@@ -248,3 +248,33 @@ BibTeX example:
     url = {https://github.com/henrylevesque/AI_Analysis_Tool}
 }
 ```
+
+# AI Assisted Analysis Tool - Quick Start
+
+## Getting Started
+
+1. **Clone the repository**
+   ```powershell
+   git clone https://github.com/hleve/AI_Assisted_Analysis_Tool.git
+   ```
+
+2. **Install dependencies**
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
+3. **Run the main script**
+   ```powershell
+   python ai_assisted_analysis.py
+   ```
+
+4. **Explore analysis modules**
+   - `other_analysis/ai_response_aggregation.py`: Aggregates AI responses
+   - `python_for_Zotero_abstracts/`: Contains thematic and methodological analysis scripts
+
+Optional: if you use Ollama models locally, pull the default model:
+```bash
+ollama pull gemma2
+```
+
+For detailed technical documentation, configuration, and developer notes, see documentation.md.
