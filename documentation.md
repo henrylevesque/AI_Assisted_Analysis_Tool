@@ -44,6 +44,12 @@ Gemma models tend to perform better than Llama models at following instructions 
 
 In general, using the smallest model that meets quality requirements yields the best performance trade-off. A 4-billion-parameter version of Gemma3 can give more consistent results with the project's prompt structure than larger models from other labs.
 
+### Prompt Structure
+The analysis code relies on a prompt structure of data description followed by a positive prompt, a negative prompt, and then a second negative prompt telling the model it will not be helpful if it does not follow the prompt. Through testing, the second negative prompt has been useful for Gemma models which really want to be helpful. 
+
+The text
+ - 'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helptful. The text is:'
+
 ### Model Configuration
 ```python
 # Model call configuration used throughout the project
