@@ -265,7 +265,7 @@ BibTeX example:
 
 3. **Run the main script**
    ```powershell
-   python ai_assisted_analysis.py
+   python text_analysis.py
    ```
 
 4. **Explore analysis modules**
