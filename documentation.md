@@ -1,7 +1,7 @@
 # AI Assisted Analysis Tool - Technical Documentation
 
 ## Executive Summary
-This document provides technical reference material for developers and researchers using the AI Assisted Analysis Tool. It covers architecture, model selection rationale, data management, the consensus algorithm, and troubleshooting. For a quick start (clone, install, run) and user-oriented overview, see README.md.
+This document provides technical reference material for developers and researchers using the AI Assisted Analysis Tool. It covers architecture, model selection rationale, data management, the consensus algorithm, and troubleshooting. For a quick start (clone, install, run) and user-oriented overview, see [READEME.md](#READEME.md).
 
 ## Getting Started
 For a short quick-start guide (clone, install, run), see README.md. This document is focused on implementation details, configuration, and internal workflows.
@@ -85,22 +85,33 @@ AI_Assisted_Analysis_Tool/
 
 ### Core Components
 
-#### 1. Custom Analysis Engine (`custom_analysis.py`)
-- **Purpose**: Flexible analysis tool for any CSV/Excel data.
-- **Features**: User-defined prompts, column selection, multiple runs per item.
-- **Output**: Raw AI responses for each content item.
+#### 1. Text Analysis Engine (`text_analysis.py`)
+- **Purpose**: Analyze tabular data (CSV or Excel) using configurable LLM models.
+- **Input Modes**: Single file or folder of files.
+- **Features**: 
+  - User-defined prompts and custom templates
+  - Column selection and flexible identifier handling
+  - Multiple runs per row for reliability
+  - Three independent consensus types: within-model, between-model, and aggregated
+- **Output**: Excel files with all responses and consensus metrics.
 
-#### 2. Response Aggregation (`ai_response_aggregation.py`)
-- **Purpose**: Post-process multiple AI responses to find consensus.
-- **Algorithm**: Word frequency analysis across responses.
-- **Output**: Consensus results with confidence scoring.
+#### 2. Image Analysis Engine (`image_analysis.py`)
+- **Purpose**: Analyze images using vision-capable LLM models.
+- **Input Modes**: Single image or folder of images.
+- **Features**: 
+  - Vision-enabled model support (e.g., Gemma3 vision)
+  - Multiple runs per image
+  - Multiple model support for comparison
+  - Three independent consensus types
+- **Output**: Excel files with image metadata and consensus results.
 
-#### 3. Integrated Analysis (`custom_analysis_with_aggregation.py`)
-- **Purpose**: Combined workflow running analysis and aggregation in sequence.
-- **Benefits**: Streamlined process, automatic consensus calculation.
-- **Output**: Complete results with consensus and confidence metrics.
+#### 3. Flexible Input/Output Handling
+Both main analysis scripts support:
+- **Input**: Single file, folder of files, or interactive path selection
+- **Output**: Direct file path, output folder, or automatic placement (defaults to input location)
+- **Path Resolution**: Intelligent handling of quoted paths and whitespace cleanup
 
-#### 4. Zotero-Specific Tools
+#### 4. Zotero-Specific Tools (Optional)
 Individual scripts for common bibliographic analysis tasks:
 - `theory.py` - Urban planning theory identification
 - `methods.py` - Research methodology extraction
@@ -141,155 +152,191 @@ ollama pull gemma2
 
 ## Workflow Processes
 
-### Standard Analysis Workflow
+### Standard Analysis Workflow (Text & Image Analysis)
 
 ```mermaid
 graph TD
-    A[Start] --> B[Read CSV/Excel File]
-    B --> C[Initialize Responses List]
-    C --> D{Loop Through Runs}
-    D --> E[Run 1]
-    D --> F[Run 2]
-    D --> G[Run N]
-    E --> H{Loop Through Rows}
-    F --> H
-    G --> H
-    H --> I[Append Title and Abstract]
-    I --> J[Generate User Content]
-    J --> K[Send to AI Model]
-    K --> L[Receive Response]
-    L --> M[Append Response to List]
-    M --> H
-    H --> N[Ensure Correct Number of Elements]
-    N --> O[Create DataFrame]
-    O --> P[Write to Excel File]
-    P --> Q[End]
-
-    style A fill:#f9f,stroke:#333,stroke-width:4px
-    style B fill:#bbf,stroke:#f66,stroke-width:2px,stroke-dasharray: 5, 5
-    style C fill:#afa,stroke:#333,stroke-width:2px
-    style D fill:#ff9,stroke:#333,stroke-width:2px
-    style E fill:#f96,stroke:#333,stroke-width:2px
-    style F fill:#f96,stroke:#333,stroke-width:2px
-    style G fill:#f96,stroke:#333,stroke-width:2px
-    style H fill:#9f9,stroke:#333,stroke-width:2px
-    style I fill:#9cf,stroke:#333,stroke-width:2px
-    style J fill:#9cf,stroke:#333,stroke-width:2px
-    style K fill:#9cf,stroke:#333,stroke-width:2px
-    style L fill:#9cf,stroke:#333,stroke-width:2px
-    style M fill:#9cf,stroke:#333,stroke-width:2px
-    style N fill:#9cf,stroke:#333,stroke-width:2px
-    style O fill:#9cf,stroke:#333,stroke-width:2px
-    style P fill:#9cf,stroke:#333,stroke-width:2px
-    style Q fill:#f9f,stroke:#333,stroke-width:4px
-```
-
-### Integrated Workflow (New)
-
-```mermaid
-graph TD
-    A[Start] --> B[User Input: Analysis Type]
-    B --> C[Load Data from CSV/Excel]
-    C --> D[Configure Columns & Runs]
-    D --> E{Process Each Row}
-    E --> F[Multiple AI Queries per Row]
-    F --> G[Store All Responses]
-    G --> E
-    E --> H[Calculate Word Frequency Consensus]
-    H --> I[Assign Confidence Scores]
-    I --> J[Generate Summary Statistics]
-    J --> K[Save Results with Consensus]
-    K --> L[Display Confidence Report]
-    L --> M[End]
+    A[Start] --> B[Resolve Input Path]
+    B --> C{Single File or Folder?}
+    C -->|Single File| D[Load Single File]
+    C -->|Folder| E[Load All Files/Images]
+    D --> F[User Configuration Prompts]
+    E --> F
+    F --> G[Configure Consensus Types]
+    G --> H{Within-Model Consensus}
+    H -->|Enabled| I[Multiple Runs per Item]
+    H -->|Disabled| J[Single Run per Item]
+    I --> K[Send to AI Model]
+    J --> K
+    K --> L[Collect Responses]
+    L --> M{Between-Model Consensus}
+    M -->|Enabled & Multiple Models| N[Calculate Per-Model Consensus]
+    M -->|Otherwise| O{Aggregated Consensus}
+    N --> O
+    O -->|Enabled| P[Calculate Aggregated Consensus]
+    O -->|Disabled| Q[Finalize Results]
+    P --> Q
+    Q --> R[Resolve Output Path]
+    R --> S[Write to Excel with Metadata]
+    S --> T[End]
 
     style A fill:#e1f5fe
     style B fill:#f3e5f5
-    style C fill:#e8f5e8
+    style C fill:#fff3e0
+    style F fill:#f3e5f5
+    style G fill:#f3e5f5
     style H fill:#fff3e0
-    style I fill:#fff3e0
-    style J fill:#fff3e0
-    style M fill:#e1f5fe
+    style M fill:#fff3e0
+    style O fill:#fff3e0
+    style R fill:#f3e5f5
+    style T fill:#e1f5fe
 ```
 
 ### Process Flow Details
 
-1. **Data Ingestion**
-   - Automatically detect CSV or Excel files in `Data_Input/`.
-   - Support for user-defined column mapping.
-   - Flexible identifier column (auto-numbering or user-selected).
+1. **Input Resolution**
+   - Intelligently handle single files or folders
+   - Support for quoted paths and whitespace cleanup
+   - Auto-detect file types (CSV, Excel, images)
 
-2. **Analysis Execution**
-   - Configurable number of runs per content item.
-   - Progress tracking with `tqdm` progress bars.
-   - Error handling and logging for failed AI requests.
+2. **Configuration**
+   - Interactive prompts for all settings or config file input
+   - CLI argument support for scripting
+   - Config precedence: CLI args -> config file -> built-in defaults
 
-3. **Consensus Calculation**
-   - Word frequency analysis across all responses (within-model consensus is computed per model across replicate runs).
-   - Optionally compute between-model consensus across models' within-model consensus columns when multiple models are used.
-   - Confidence scoring based on agreement levels.
-   - Fallback to the most common full response if no word consensus.
+3. **Analysis Execution**
+   - Configurable number of runs per item (for within-model consensus)
+   - Multiple model support (for between-model consensus)
+   - Progress tracking with `tqdm` progress bars
+   - Error handling and logging for failed AI requests
 
-4. **Output Generation**
-   - Excel files with all original responses preserved.
-   - Additional consensus columns with confidence metrics.
-   - Summary statistics for quality assessment.
+4. **Consensus Calculation** (Three Independent Types)
+   - **Within-Model Consensus**: Aggregates multiple runs using same model
+     - Modes: exact (text match), set (unordered tokens), fuzzy (similarity-based)
+     - Produces: `Consensus_{ModelName}` and `Consensus_Confidence_{ModelName}` columns
+   - **Between-Model Consensus**: Aggregates per-model consensus results (only if 2+ models)
+     - Modes: exact, set, fuzzy (independently configurable)
+     - Produces: `BetweenModel_Consensus` and `BetweenModel_Consensus_Confidence` columns
+   - **Aggregated Consensus**: Independent consensus across ALL response columns
+     - Modes: exact, set, fuzzy (independently configurable)
+     - Produces: `Aggregated_Consensus` and `Aggregated_Consensus_Confidence` columns
+
+5. **Output Generation**
+   - Excel files with all original responses preserved
+   - Additional consensus columns with confidence metrics (based on enabled types)
+   - Summary statistics for quality assessment
+   - Analysis metadata (models used, run counts, duration, CPU/GPU info)
+   - Flexible output path options
 
 ## Consensus Algorithm
 
 ### Algorithm Overview
-The consensus mechanism uses a word-frequency approach to identify agreement across multiple AI responses.
+The consensus mechanism uses three independent, configurable approaches to identify agreement across multiple AI responses. Each consensus type can be configured independently with different algorithms and parameters.
 
-### Step-by-Step Process
+### Consensus Modes
+
+#### 1. Exact Match Mode
+- Finds responses that match completely
+- Most restrictive; suitable for categorical or structured responses
+- Confidence = (count of most frequent response) / (total responses)
+
+#### 2. Set Mode (Unordered Token Matching)
+- Normalizes and tokenizes responses
+- Treats responses as sets of words/tokens
+- Calculates agreement based on shared tokens
+- More flexible than exact match; suitable for variable phrasing
+- Confidence = (shared tokens across responses) / (total unique tokens)
+
+#### 3. Fuzzy Match Mode
+- Uses token-based similarity matching (via rapidfuzz library)
+- Configurable threshold (0.0-1.0) for similarity requirement
+- Most flexible; handles paraphrasing and minor variations
+- Best for natural language responses
+- Confidence = (average similarity of matched responses) / (total responses)
+
+### Step-by-Step Process (Set Mode Example)
 
 1. **Response Normalization**
    ```python
-   normalized_responses = [re.split(r'\s+', str(r).lower().strip()) for r in responses]
+   normalized_responses = [set(re.split(r'\s+', str(r).lower().strip())) for r in responses]
    ```
 
-2. **Word Frequency Analysis**
+2. **Token Analysis**
    ```python
-   all_words = [word for response in normalized_responses for word in response if word]
-   word_counts = Counter(all_words)
+   all_tokens = set().union(*normalized_responses)
+   token_agreement = {token: sum(1 for r in normalized_responses if token in r) for token in all_tokens}
    ```
 
 3. **Consensus Identification**
    ```python
-   consensus_words = [word for word, count in word_counts.items() if count > 1]
+   consensus_tokens = [token for token, count in token_agreement.items() if count > total_responses // 2]
    ```
 
 4. **Confidence Calculation**
    ```python
-   confidence = len(consensus_words) / total_unique_words
+   confidence = len(consensus_tokens) / len(all_tokens)
    ```
 
 ### Confidence Levels
-- **High Confidence (≥70%)**: Strong agreement across responses.
+- **High Confidence (>=70%)**: Strong agreement across responses.
 - **Medium Confidence (40–69%)**: Moderate agreement; generally reliable.
 - **Low Confidence (<40%)**: Poor agreement; requires manual review.
 
 ### Edge Cases Handled
 - **Single Response**: Automatic confidence of 100%.
-- **No Word Consensus**: Falls back to the most frequent complete response.
-- **Empty/Error Responses**: Handled gracefully with appropriate confidence scores.
+- **No Consensus Found**: Falls back to the most frequent complete response.
+- **Empty/Error Responses**: Handled gracefully with confidence score of 0%.
+- **Disabled Consensus Type**: Column not generated if consensus type is disabled.
 
 ## File Structure
 
 ### Input Files
-- **CSV Format**: Standard comma-separated values.
-- **Excel Format**: .xlsx files supported via `openpyxl`.
-- **Column Flexibility**: Any column can serve as identifier or content.
+
+**Text Analysis:**
+- **CSV Format**: Standard comma-separated values with configurable columns
+- **Excel Format**: .xlsx files with flexible sheet and column selection
+- **Input Modes**: 
+  - Single file: `python text_analysis.py --input path/to/file.csv`
+  - Folder: `python text_analysis.py --input path/to/folder/`
+  - Interactive: Script prompts for path if not specified
+- **Column Flexibility**: Any column can serve as identifier, content, or be skipped
+
+**Image Analysis:**
+- **Supported Formats**: JPG, PNG, TIFF, BMP, GIF, WebP
+- **Input Modes**:
+  - Single image: `python image_analysis.py --input path/to/image.jpg`
+  - Folder of images: `python image_analysis.py --input path/to/images/`
+  - Interactive: Script prompts for path if not specified
 
 ### Output Files
-Standard naming convention: `{original_filename}_{analysis_type}_with_consensus.xlsx`
+
+**Naming Convention:**
+- Single file input: `{original_filename}_{analysis_type}_{runs}runs_{models}model.xlsx`
+- Folder input: `AI_Analysis_{timestamp}_{runs}runs_{models}model.xlsx`
+
+**Output Path Options:**
+- Direct file path: `--output /path/to/output.xlsx` (creates file at specified location)
+- Folder path: `--output /path/to/folder/` (auto-generates filename in folder)
+- None/Auto: Output placed in same directory as input file (default behavior)
 
 ### Output Columns
+
+**Always Present:**
 | Column | Description |
-|--------|-------------|
-| `Identifier` | Row identifier (user-selected or auto-generated) |
-| `Content` | Original content that was analyzed |
-| `Response_1` to `Response_N` | Individual AI responses |
-| `Consensus_Result` | Agreed-upon result from consensus algorithm |
-| `Consensus_Confidence` | Numerical confidence score (0.0–1.0) |
+|--------|------------|
+| `Identifier` | Row/image identifier (user-selected or auto-generated) |
+| `Content` | Original content/image name that was analyzed |
+| `Response_1` to `Response_N` | Individual AI responses per run |
+
+**Conditional (Based on Configuration):**
+| Column | Description | When Present |
+|--------|------------|-----------|
+| `Consensus_{ModelName}` | Within-model consensus result | If within_model=true & num_models > 1 |
+| `Consensus_Confidence_{ModelName}` | Within-model confidence (0.0–1.0) | If within_model=true & num_models > 1 |
+| `BetweenModel_Consensus` | Between-model consensus result | If between_model=true & num_models > 1 |
+| `BetweenModel_Consensus_Confidence` | Between-model confidence (0.0–1.0) | If between_model=true & num_models > 1 |
+| `Aggregated_Consensus` | Consensus across all responses | If aggregate=true |
+| `Aggregated_Consensus_Confidence` | Aggregated confidence (0.0–1.0) | If aggregate=true |
 
 ## Troubleshooting
 
@@ -316,9 +363,17 @@ ollama serve
 # Verify model is available
 ollama list
 
-# Pull model if missing
-ollama pull gemma2
+# Pull required models
+ollama pull gemma2       # For text analysis
+ollama pull gemma2:13b   # For larger model
+ollama pull gemma3       # For image analysis (vision-capable)
 ```
+
+#### Model Recommendations
+- **Text Analysis**: `gemma2` (9B) - balanced performance/quality
+- **Image Analysis**: `gemma3` (12B vision) - supports vision tasks
+- **GPU Available**: Use larger variants (13B+) for better quality
+- **CPU Only**: Stick with smaller variants (7B) for speed
 
 #### Excel File Errors
 **Problem**: Cannot write Excel files  
@@ -340,11 +395,21 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 #### Memory Management
 - Process large datasets in chunks if memory issues occur.
 - Close Excel files before processing to avoid conflicts.
+- Monitor Ollama memory usage with `ollama serve` logs
 
 #### Speed Optimization
-- Use smaller models for faster processing (trade-off with quality).
-- Reduce number of runs per item for quicker results.
-- Process subsets of data for testing before full runs.
+- Use smaller models for faster processing (trade-off with quality)
+  - Text: `gemma2:7b` instead of `gemma2:13b`
+  - Images: Smaller vision models for faster processing
+- Reduce number of runs per item for quicker results (num_runs=2 for testing)
+- Disable between-model consensus if only using one model
+- Disable aggregated consensus if not needed
+- Process subsets of data for testing before full runs
+
+#### Configuration Tips
+- Use `exact` match mode for fastest consensus (less computation)
+- Use `fuzzy` mode only when needed (slower due to similarity calculations)
+- Set appropriate fuzzy threshold (0.7-0.9) to avoid excessive matching
 
 ### Error Recovery
 - All errors are logged with row and run information.
@@ -353,12 +418,19 @@ powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 
 ## Version History
 
-### Recent Updates
-- **Package Dependencies**: Fixed `ollama_python` → `ollama` naming issue.
+### Recent Updates (Current Version)
+- **Unified Scripts**: Replaced individual scripts with `text_analysis.py` and `image_analysis.py`.
+- **Flexible Input/Output**: Support for single files, folders, and intelligent path resolution.
+- **Three Independent Consensus Types**: Within-model, between-model, and aggregated consensus now independently configurable.
+- **Enhanced Configuration**: Interactive prompts, config files (YAML/JSON), and CLI argument support.
+- **Type Safety**: Added None checks and assertions for robust error handling.
+- **Better Metadata**: Comprehensive analysis metadata (models, runs, duration, CPU/GPU info) appended to outputs.
+
+### Previous Updates
+- **Package Dependencies**: Fixed `ollama_python` -> `ollama` naming issue.
 - **Excel Support**: Added `openpyxl` for robust Excel handling.
-- **Integrated Workflow**: New `custom_analysis_with_aggregation.py`.
+- **Integrated Workflow**: Combined analysis and consensus calculation.
 - **Enhanced Consensus**: Improved algorithm with better confidence scoring.
-- **Documentation**: Comprehensive technical documentation added.
 
 ## Reporting Analysis in Excel/Spreadsheet software
 You can report number of words/numbers by using an H stack to create a count that you can then visualize with a bar chart.
