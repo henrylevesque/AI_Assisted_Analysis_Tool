@@ -33,6 +33,101 @@ def list_image_files(folder):
             out.append(f)
     return out
 
+
+def _clean_path_helper(p: str):
+    """Helper to clean path (remove quotes, whitespace)."""
+    if p is None:
+        return p
+    p = str(p).strip()
+    if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
+        p = p[1:-1].strip()
+    return p
+
+
+def is_image_file(path):
+    """Check if path is an image file."""
+    if not path:
+        return False
+    p = _clean_path_helper(path)
+    exts = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp')
+    return os.path.isfile(p) and p.lower().endswith(exts)
+
+
+def resolve_input_images(input_path) -> tuple:
+    """
+    Resolve input to images (single file or folder of images).
+    
+    Args:
+        input_path: Path to an image file or folder of images
+        
+    Returns:
+        (images_list, input_folder) where images_list is filenames and input_folder is the directory
+        
+    Raises:
+        FileNotFoundError: If path cannot be found or no valid images found
+    """
+    if not input_path:
+        raise ValueError("Input path is required")
+    
+    input_path = _clean_path_helper(input_path)
+    
+    # Case 1: Single image file
+    if is_image_file(input_path):
+        folder = os.path.dirname(input_path) or '.'
+        filename = os.path.basename(input_path)
+        return [filename], folder
+    
+    # Case 2: Directory of images
+    if os.path.isdir(input_path):
+        images = list_image_files(input_path)
+        if not images:
+            raise FileNotFoundError(f"No image files found in folder: {input_path}")
+        return images, input_path
+    
+    # Case 3: Path doesn't exist
+    raise FileNotFoundError(f"Input path not found: {input_path}")
+
+
+def resolve_output_path(input_path, output_spec, num_images, num_runs, num_models) -> str:
+    """
+    Resolve output file path from various output specifications.
+    
+    Args:
+        input_path: The input file or folder path (used for context)
+        output_spec: User-specified output (file path, folder path, or None)
+        num_images: Number of images (for filename)
+        num_runs: Number of runs (for filename)
+        num_models: Number of models (for filename)
+        
+    Returns:
+        Full output file path ready to write to
+    """
+    input_path = _clean_path_helper(input_path)
+    output_spec = _clean_path_helper(output_spec) if output_spec else None
+    
+    # Default: same folder as input
+    if not output_spec:
+        if os.path.isfile(input_path):
+            output_dir = os.path.dirname(input_path) or '.'
+        else:  # folder
+            output_dir = input_path
+    # Output spec is a directory
+    elif os.path.isdir(output_spec):
+        output_dir = output_spec
+    # Output spec is a file path (with .xlsx extension) - use it directly
+    elif output_spec.endswith('.xlsx'):
+        return output_spec
+    # Output spec might be a folder that doesn't exist yet - create it
+    else:
+        output_dir = output_spec
+        os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate output filename
+    suffix = f"{num_images}images_{num_runs}runs_multi.xlsx" if num_models > 1 else f"{num_images}images_{num_runs}runs.xlsx"
+    output_filename = f"image_analysis_{suffix}"
+    
+    return os.path.join(output_dir, output_filename)
+
 def load_config(path):
     """
     Load a JSON or YAML configuration file from path and return the parsed dict.
@@ -222,6 +317,10 @@ def main():
     parser.add_argument('--between-model-fuzzy-threshold', type=int, help='Between-model fuzzy threshold (0-100)')
     parser.add_argument('--delay', type=float, help='Delay between model runs in seconds')
     parser.add_argument('--type-of-analysis', help='What to identify in images (objects, scene, text)')
+    # Aggregation flag: aggregate AI responses for consensus across the output file
+    parser.add_argument('--aggregate', dest='aggregate', action='store_true', help='Aggregate AI responses for consensus across the output file')
+    parser.add_argument('--no-aggregate', dest='aggregate', action='store_false', help='Do not aggregate AI responses for consensus across the output file')
+    parser.set_defaults(aggregate=None)
     # Metadata appending to Excel output (tri-state)
     parser.add_argument('--append-metadata', dest='append_metadata', action='store_true', help='Append metadata to Excel output')
     parser.add_argument('--no-append-metadata', dest='append_metadata', action='store_false', help='Do not append metadata to Excel output')
@@ -341,8 +440,45 @@ def main():
     else:
         between_model = True if between_model in (True, 'y', 'yes', 'Y', '1') else False
 
+    # Between-model mode/threshold: ask now if applicable
     between_model_mode = between_model_mode or within_model_mode
     between_model_fuzzy_threshold = between_model_fuzzy_threshold or within_model_fuzzy_threshold
+    if between_model and between_model_mode is None and not args.no_interactive:
+        bm_mode = input(f"Between-model consensus mode (exact/set/fuzzy) [{between_model_mode}]: ").strip().lower()
+        between_model_mode = bm_mode or between_model_mode
+    if between_model and between_model_mode == 'fuzzy' and not _get('between-model-fuzzy-threshold') and not args.no_interactive:
+        thr_b = input(f"Between-model fuzzy threshold (0-100) [{between_model_fuzzy_threshold}]: ").strip()
+        try:
+            between_model_fuzzy_threshold = int(thr_b) if thr_b else between_model_fuzzy_threshold
+        except Exception:
+            pass
+
+    # Aggregation decision (tri-state via CLI/config). Default = False.
+    aggregated_choice = _get('aggregate') if _get('aggregate') is not None else None
+    if aggregated_choice is None:
+        if args.no_interactive:
+            aggregated_choice = False
+        else:
+            agg_resp = input("Do you want to aggregate AI responses for consensus across the output file? (y/n) [n]: ").strip().lower()
+            aggregated_choice = True if agg_resp in ('y', 'yes') else False
+    else:
+        aggregated_choice = True if aggregated_choice in (True, 'y', 'yes', 'Y', '1') else False
+
+    # Aggregated consensus mode/threshold if applicable
+    agg_mode = within_model_mode
+    agg_fuzzy_thr = within_model_fuzzy_threshold
+    if aggregated_choice:
+        # allow override via config/CLI
+        agg_mode = _get('aggregated_consensus_mode') or _get('aggregate_consensus_mode') or agg_mode
+        agg_fuzzy_thr = _get('aggregated_fuzzy_threshold') or _get('aggregate_fuzzy_threshold') or agg_fuzzy_thr
+        if not args.no_interactive:
+            agg_mode = input(f"Aggregated consensus mode (exact/set/fuzzy) [{agg_mode}]: ").strip().lower() or agg_mode
+            if agg_mode == 'fuzzy':
+                thr_in = input(f"Aggregated fuzzy threshold (0-100) [{agg_fuzzy_thr}]: ").strip()
+                try:
+                    agg_fuzzy_thr = int(thr_in) if thr_in else agg_fuzzy_thr
+                except Exception:
+                    pass
 
     # Append metadata decision (tri-state: CLI/config overrides prompt unless --no-interactive is False)
     append_metadata = _get('append-metadata') if _get('append-metadata') is not None else None
@@ -363,20 +499,19 @@ def main():
     ).format(what=type_of_analysis)
 
     # Input/output folders
-    data_input_folder = _get('input') or (input("Enter the path to the image input folder: ").strip() if not args.no_interactive else None)
-    data_output_folder = _get('output') or (input("Enter the path to the data output folder: ").strip() if not args.no_interactive else None)
+    data_input_folder = _get('input') or (input("Enter the path to an image file or folder: ").strip() if not args.no_interactive else None)
+    data_output_folder = _get('output') or (input("Enter the path to the data output file or folder [same as input]: ").strip() if not args.no_interactive else None)
     if not data_input_folder:
-        raise FileNotFoundError("Input folder not specified.")
-    if not data_output_folder:
-        data_output_folder = os.getcwd()
-    if not os.path.isdir(data_input_folder):
-        raise FileNotFoundError("Input folder not found.")
-    if not os.path.isdir(data_output_folder):
-        os.makedirs(data_output_folder, exist_ok=True)
-
-    images = list_image_files(data_input_folder)
+        raise FileNotFoundError("Input path not specified.")
+    
+    # Resolve input images
+    try:
+        images, input_folder = resolve_input_images(data_input_folder)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Error: {e}")
+    
     if not images:
-        raise FileNotFoundError("No image files found in the specified input folder.")
+        raise FileNotFoundError("No image files found.")
 
     num_runs = _get('runs') or (int(input("Enter number of times to run analysis per image: ").strip()) if not args.no_interactive else 1)
     switch_delay = _get('delay') if _get('delay') is not None else None
@@ -386,8 +521,17 @@ def main():
             switch_delay = float(delay_input) if delay_input else 0.0
         else:
             switch_delay = 0.0
-    output_file_name = f"image_analysis_{len(images)}images_{num_runs}runs_multi.xlsx"
-    output_file_path = os.path.join(data_output_folder, output_file_name)
+    
+    # Resolve output file path using new resolver
+    output_file_path = resolve_output_path(data_input_folder, data_output_folder, len(images), num_runs, len(models_to_run))
+    
+    # Ensure output directory exists
+    output_dir = os.path.dirname(output_file_path) or '.'
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Output will be saved to: {output_file_path}")
+    except Exception as e:
+        print(f"Warning: could not create output directory {output_dir}: {e}")
 
     # Master dataframe construction: start with Image column
     master_df = pd.DataFrame({"Image": images})
@@ -437,28 +581,6 @@ def main():
     analysis_duration = analysis_end - analysis_start
     print(f"\nCombined analysis complete. Results saved to {output_file_path}")
 
-    # Append metadata
-    try:
-        from openpyxl import load_workbook
-        wb = load_workbook(output_file_path)
-        ws = wb.active
-        ws.append([])
-        ws.append(["Prompt used:", prompt_template])
-        ws.append(["Models used:", ', '.join(metadata_models)])
-        ws.append([f"Runs per image: {num_runs}"])
-        ws.append([f"Delay between model runs: {switch_delay} seconds"])
-        ws.append([f"Within-model consensus enabled: {within_model}"])
-        ws.append([f"Within-model consensus mode: {within_model_mode}"])
-        if within_model_mode == 'fuzzy':
-            ws.append([f"Within-model fuzzy threshold: {within_model_fuzzy_threshold}"])
-        hours, rem = divmod(analysis_duration, 3600)
-        minutes, seconds = divmod(rem, 60)
-        ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
-        wb.save(output_file_path)
-        print("Reporting metadata appended.")
-    except Exception as e:
-        print(f"Could not append reporting metadata: {e}")
-
     # Consolidated aggregated consensus and cross-model consensus (optional)
     try:
         # read the saved sheet for post-hoc aggregation
@@ -470,11 +592,8 @@ def main():
 
         aggregated = False
         agg_summary = {}
-        # Use pre-run between-model consensus selection
-        if between_model and df_report is not None:
-            agg_mode = between_model_mode
-            agg_fuzzy_thr = between_model_fuzzy_threshold
-
+        # Use pre-run aggregation choice (independent from between_model)
+        if aggregated_choice and df_report is not None:
             response_cols = [col for col in df_report.columns if col.lower().startswith('response')]
             print(f"\nFound {len(response_cols)} response columns. Calculating aggregated consensus using mode={agg_mode}...")
 
@@ -531,6 +650,8 @@ def main():
             from openpyxl import load_workbook
             wb = load_workbook(output_file_path)
             ws = wb.active
+            if ws is None:
+                raise ValueError("Could not access worksheet")
             ws.append([])
             ws.append(["Prompt used:", prompt_template])
             ws.append(["Models used:", ', '.join(metadata_models)])
@@ -540,10 +661,16 @@ def main():
             ws.append([f"Within-model consensus mode: {within_model_mode}"])
             if within_model_mode == 'fuzzy':
                 ws.append([f"Within-model fuzzy threshold: {within_model_fuzzy_threshold}"])
-            ws.append([f"Between-model consensus enabled: {between_model}"])
-            ws.append([f"Between-model consensus mode: {between_model_mode}"])
-            if between_model_mode == 'fuzzy':
-                ws.append([f"Between-model fuzzy threshold: {between_model_fuzzy_threshold}"])
+            if len(metadata_models) > 1:
+                ws.append([f"Between-model consensus enabled: {between_model}"])
+                ws.append([f"Between-model consensus mode: {between_model_mode}"])
+                if between_model_mode == 'fuzzy':
+                    ws.append([f"Between-model fuzzy threshold: {between_model_fuzzy_threshold}"])
+            ws.append([f"Aggregated consensus enabled: {aggregated_choice}"])
+            if aggregated_choice:
+                ws.append([f"Aggregated consensus mode: {agg_mode}"])
+                if agg_mode == 'fuzzy':
+                    ws.append([f"Aggregated fuzzy threshold: {agg_fuzzy_thr}"])
             hours, rem = divmod(analysis_duration, 3600)
             minutes, seconds = divmod(rem, 60)
             ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
@@ -556,9 +683,11 @@ def main():
                 ws.append([f"Low confidence (<40%): {agg_summary.get('low', 0)} rows"])
                 if agg_summary.get('low', 0) > 0:
                     ws.append(["Rows with low confidence may require manual review:"])
-                    for idx, row in agg_summary.get('low_rows').iterrows():
-                        id_display = row.get('Image', idx + 1)
-                        ws.append([f"Row {idx + 1}: {id_display} (confidence: {row['Aggregated_Consensus_Confidence']:.1%})"])
+                    low_rows = agg_summary.get('low_rows')
+                    if low_rows is not None:
+                        for idx, row in low_rows.iterrows():
+                            id_display = row.get('Image', idx + 1)
+                            ws.append([f"Row {idx + 1}: {id_display} (confidence: {row['Aggregated_Consensus_Confidence']:.1%})"])
 
             # CPU/GPU info
             try:

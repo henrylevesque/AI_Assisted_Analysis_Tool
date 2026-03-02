@@ -17,7 +17,108 @@ from ollama import chat
 
 
 def list_input_file(folder):
+    """List first CSV or XLSX file found in folder."""
     return next((f for f in os.listdir(folder) if f.endswith('.csv') or f.endswith('.xlsx')), None)
+
+
+def is_file(path):
+    """Check if path is a file (not a directory)."""
+    if not path:
+        return False
+    p = _clean_path_helper(path)
+    return os.path.isfile(p)
+
+
+def is_dir(path):
+    """Check if path is a directory."""
+    if not path:
+        return False
+    p = _clean_path_helper(path)
+    return os.path.isdir(p)
+
+
+def _clean_path_helper(p: str):
+    """Helper to clean path (remove quotes, whitespace)."""
+    if p is None:
+        return p
+    p = str(p).strip()
+    if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
+        p = p[1:-1].strip()
+    return p
+
+
+def resolve_input_file(input_path) -> tuple:
+    """
+    Resolve input to a single file (Excel or CSV).
+    
+    Args:
+        input_path: Path to a file or folder
+        
+    Returns:
+        (file_path, display_path) where file_path is the resolved file and display_path is for user messages
+        
+    Raises:
+        FileNotFoundError: If file/folder cannot be found or no valid file in folder
+    """
+    if not input_path:
+        raise ValueError("Input path is required")
+    
+    input_path = _clean_path_helper(input_path)
+    
+    # Case 1: Direct file path
+    if os.path.isfile(input_path):
+        if not (input_path.endswith('.csv') or input_path.endswith('.xlsx')):
+            raise ValueError(f"Input file must be .csv or .xlsx, got: {input_path}")
+        return input_path, input_path
+    
+    # Case 2: Directory path
+    if os.path.isdir(input_path):
+        found_file = list_input_file(input_path)
+        if not found_file:
+            raise FileNotFoundError(f"No .csv or .xlsx file found in folder: {input_path}")
+        full_path = os.path.join(input_path, found_file)
+        return full_path, full_path
+    
+    # Case 3: Path doesn't exist
+    raise FileNotFoundError(f"Input path not found: {input_path}")
+
+
+def resolve_output_path(input_file_path, output_spec, num_runs, num_models) -> str:
+    """
+    Resolve output file path from various output specifications.
+    
+    Args:
+        input_file_path: The input file path (used for naming)
+        output_spec: User-specified output (file path, folder path, or None)
+        num_runs: Number of runs (for filename)
+        num_models: Number of models (for filename)
+        
+    Returns:
+        Full output file path ready to write to
+    """
+    input_file_path = _clean_path_helper(input_file_path)
+    output_spec = _clean_path_helper(output_spec) if output_spec else None
+    
+    # Default: same folder as input file
+    if not output_spec:
+        output_dir = os.path.dirname(input_file_path) or '.'
+    # Output spec is a directory
+    elif os.path.isdir(output_spec):
+        output_dir = output_spec
+    # Output spec is a file path (with .xlsx or .csv extension) - use its directory and filename
+    elif output_spec.endswith(('.xlsx', '.csv')):
+        return output_spec
+    # Output spec might be a folder that doesn't exist yet - create it
+    else:
+        output_dir = output_spec
+        os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate output filename from input filename
+    base_name = os.path.splitext(os.path.basename(input_file_path))[0]
+    suffix = f"{num_runs}runs_multi.xlsx" if num_models > 1 else f"{num_runs}runs.xlsx"
+    output_filename = f"{base_name}_text_analysis_{suffix}"
+    
+    return os.path.join(output_dir, output_filename)
 
 
 def load_config(path: str):
@@ -168,42 +269,42 @@ def main():
             # non-interactive and no CLI models: use discovered or suggested
             models_to_run = models if models else suggested
 
-    data_in = _get('input') or (input('Data input folder [.] : ').strip() if not args.no_interactive else '.')
-    data_out = _get('output') or (input('Data output folder [.] : ').strip() if not args.no_interactive else '.')
+    data_in = _get('input') or (input('Data input file or folder [.] : ').strip() if not args.no_interactive else '.')
+    data_out = _get('output') or (input('Data output file or folder [same as input] : ').strip() if not args.no_interactive else None)
     # Ensure prompt_desc is always defined (may come from CLI/config)
     prompt_desc = _get('prompt_desc') or _get('prompt-desc') or None
     # Interactive prompt for description (only when interactive allowed)
     if not args.no_interactive:
         if data_in == '.':
-            print("Warning: Using current directory ('.') as input folder. Specify --input to override.")
-        if data_out == '.':
-            print("Warning: Using current directory ('.') as output folder. Specify --output to override.")
-        # If user provides an input here, prefer it; otherwise keep any config/CLI-provided value
-        resp_desc = input('Enter what you want the model or models to identify within the text: ').strip()
-        if resp_desc:
-            prompt_desc = resp_desc
+            print("Tip: Using current directory ('.') as input. Specify --input <path> to use a different file/folder.")
+        if not data_out:
+            print("Tip: Output will be saved to the same folder as the input file.  Specify --output <path> to change.")
+        if not prompt_desc:
+            resp_desc = input('Enter what you want the model or models to identify within the text: ').strip()
+            if resp_desc:
+                prompt_desc = resp_desc
     prompt_desc = prompt_desc or 'the main topic'
     
-    # Clean up input/output paths in case they were provided with surrounding quotes
+    # Clean up paths
     def _clean_path(p: str):
-        if p is None:
-            return p
-        p = str(p).strip()
-        # remove surrounding quotes if present
-        if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
-            p = p[1:-1].strip()
-        return p
+        return _clean_path_helper(p)
+    
     data_in = _clean_path(data_in)
-    data_out = _clean_path(data_out)
+    if data_out:
+        data_out = _clean_path(data_out)
+    
     prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helptful. The text is:'
-    # Do not re-prompt for output folder here (already collected above).
-
-    f = list_input_file(data_in)
-    if not f:
-        print('No input CSV/XLSX found in', data_in)
+    
+    # Resolve input file path
+    try:
+        input_file_path, _ = resolve_input_file(data_in)
+    except (FileNotFoundError, ValueError) as e:
+        print(f'Error: {e}')
         return
-    path = os.path.join(data_in, f)
-    df = pd.read_csv(path) if path.endswith('.csv') else pd.read_excel(path)
+    
+    # Load dataframe
+    print(f"Loading data from: {input_file_path}")
+    df = pd.read_csv(input_file_path) if input_file_path.endswith('.csv') else pd.read_excel(input_file_path)
 
     # columns and runs: attempt to pull from CLI/config, otherwise interactive
     id_col = _get('id_col') or None
@@ -505,21 +606,15 @@ def main():
             time.sleep(switch_delay)
 
     # After running models, reorder columns and save
-    base = os.path.splitext(f)[0]
-    outname = f"{base}_text_analysis_{num_runs}runs_multi.xlsx" if len(models_to_run) > 1 else f"{base}_text_analysis_{num_runs}runs.xlsx"
-    outpath = os.path.join(data_out, outname)
-    # Ensure output directory is cleaned and exists (robust against quoted input)
+    outpath = resolve_output_path(input_file_path, data_out, num_runs, len(models_to_run))
+    
+    # Ensure output directory exists
+    output_dir = os.path.dirname(outpath) or '.'
     try:
-        data_out = _clean_path(data_out)
-    except Exception:
-        data_out = data_out
-    outpath = os.path.join(data_out, outname)
-    if not os.path.isdir(data_out):
-        try:
-            os.makedirs(data_out, exist_ok=True)
-            print(f"Created output directory: {data_out}")
-        except Exception as e:
-            print(f"Warning: could not create output directory {data_out}: {e}. Will attempt to write to it and may fail.")
+        os.makedirs(output_dir, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: could not create output directory {output_dir}: {e}")
+    
     try:
         master_df = reorder_columns_posthoc(master_df, models_to_run, num_runs)
     except Exception as e:
@@ -606,6 +701,8 @@ def main():
             from openpyxl import load_workbook
             wb = load_workbook(outpath)
             ws = wb.active
+            if ws is None:
+                raise ValueError("Could not access worksheet")
             ws.append([])
             ws.append(["Prompt used:", prompt_template])
             ws.append(["Models used:", ', '.join(metadata_models)])
@@ -628,14 +725,16 @@ def main():
                 ws.append([f"Low confidence (<40%): {agg_summary.get('low', 0)} rows"])
                 if agg_summary.get('low', 0) > 0:
                     ws.append(["Rows with low confidence may require manual review:"])
-                    for idx, row in agg_summary.get('low_rows').iterrows():
-                        id_display = row.get('Identifier', idx + 1)
-                        conf_col = 'Aggregated_Consensus_Confidence' if 'Aggregated_Consensus_Confidence' in row else 'Consensus_Confidence'
-                        try:
-                            conf_val = row[conf_col]
-                            ws.append([f"Row {idx + 1}: {id_display} (confidence: {conf_val:.1%})"])
-                        except Exception:
-                            ws.append([f"Row {idx + 1}: {id_display} (confidence: unknown)"])
+                    low_rows = agg_summary.get('low_rows')
+                    if low_rows is not None:
+                        for idx, row in low_rows.iterrows():
+                            id_display = row.get('Identifier', idx + 1)
+                            conf_col = 'Aggregated_Consensus_Confidence' if 'Aggregated_Consensus_Confidence' in row else 'Consensus_Confidence'
+                            try:
+                                conf_val = row[conf_col]
+                                ws.append([f"Row {idx + 1}: {id_display} (confidence: {conf_val:.1%})"])
+                            except Exception:
+                                ws.append([f"Row {idx + 1}: {id_display} (confidence: unknown)"])
 
             # CPU/GPU info
             try:

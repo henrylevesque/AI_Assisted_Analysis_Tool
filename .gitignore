@@ -5,3 +5,6 @@ Data_Output/*
 Data_Analysis/*
 nextsteps.md
 __pycache__/
+*.pyc
+*.pyo
+*.egg-info/
