@@ -130,7 +130,7 @@ Then follow prompts to:
 
 ### How to use (Config-based, recommended for reproducibility)
 
-1. **Create a config file** (see `text_config_example.yaml` or `text_config_example.json` for templates):
+1. **Create a config file** (see [text_config_example.yaml](text_config_example.yaml) or [text_config_example.json](text_config_example.json) for templates):
 
 ```yaml
 models: ['gemma3:12b']
@@ -217,7 +217,7 @@ Then follow prompts to:
 
 ### How to use (Config-based, recommended for reproducibility)
 
-1. **Create a config file** (see `image_config_example.yaml` or `image_config_example.json` for templates):
+1. **Create a config file** (see [image_config_example.yaml](image_config_example.yaml) or [image_config_example.json](image_config_example.json) for templates):
 
 ```yaml
 models: ['gemma3:12b', 'llava:13b']
@@ -475,15 +475,15 @@ pip install -r requirements.txt
 
 ## Getting started
 
-See `documentation.md` for a step-by-step guide and example configs in the repo (`image_config_example.yaml`, `text_config_example.yaml`).
+See [documentation.md](documentation.md) for a step-by-step guide and example configs in the repo ([image_config_example.yaml](image_config_example.yaml), [text_config_example.yaml](text_config_example.yaml)).
 
 ## Contributing
 
-Contributions are welcome. See `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` for guidelines.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for guidelines.
 
 ## License & Citation
 
-See `LICENSE` for license terms. If you use this software (or parts of it) in a publication, please cite this project using the metadata in `CITATION.cff`.
+See [LICENSE](LICENSE) for license terms. If you use this software (or parts of it) in a publication, please cite this project using the metadata in [CITATION.cff](CITATION.cff).
 
 Example (APA):
 
@@ -530,4 +530,4 @@ Optional: if you use Ollama models locally, pull the default model:
 ollama pull gemma2
 ```
 
-For detailed technical documentation, configuration, and developer notes, see documentation.md.
+For detailed technical documentation, configuration, and developer notes, see [documentation.md](documentation.md).
