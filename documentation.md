@@ -1,10 +1,10 @@
 # AI Assisted Analysis Tool - Technical Documentation
 
 ## Executive Summary
-This document provides technical reference material for developers and researchers using the AI Assisted Analysis Tool. It covers architecture, model selection rationale, data management, the consensus algorithm, and troubleshooting. For a quick start (clone, install, run) and user-oriented overview, see [README.md](#readme.md).
+This document provides technical reference material for developers and researchers using the AI Assisted Analysis Tool. It covers architecture, model selection rationale, data management, the consensus algorithm, and troubleshooting. For a quick start (clone, install, run) and user-oriented overview, see [README.md](README.md).
 
 ## Getting Started
-For a short quick-start guide (clone, install, run), see README.md. This document is focused on implementation details, configuration, and internal workflows.
+For a short quick-start guide (clone, install, run), see [README.md](README.md). This document is focused on implementation details, configuration, and internal workflows.
 
 ---
 
