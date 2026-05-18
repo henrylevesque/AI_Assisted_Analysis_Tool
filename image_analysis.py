@@ -488,14 +488,14 @@ def main():
     else:
         append_metadata = True if append_metadata in (True, 'y', 'yes', '1') else False
 
-    # Prompt / analysis instruction
+    # Prompt / analysis instruction (for use in design contexts, it can be helpful to add "you are a design expert in a design review" at the beginning of the prompt template to orient the llms.)
     type_of_analysis = _get('type-of-analysis') or None
     if not type_of_analysis and not args.no_interactive:
         type_of_analysis = input("Enter what you want the program to identify within the image(s) (e.g., objects, scene, text): ").strip()
     type_of_analysis = type_of_analysis or 'objects'
     prompt_template = (
         "You are a design expert in a design review. You will be shown an image. Please tell me {what} concisely and only return {what}. "
-        "If multiple items are present, separate them with commas. if you tell me anything other than {what}, you will not be helpful."
+        "If multiple items are present, separate them with commas. If you tell me anything other than {what}, you will not be helpful."
     ).format(what=type_of_analysis)
 
     # Input/output folders
