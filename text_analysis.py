@@ -13,7 +13,7 @@ try:
 except Exception:
     yaml = None
 from tqdm import tqdm
-from ollama import chat
+from ollama import generate
 
 
 def list_input_file(folder):
@@ -50,27 +50,27 @@ def _clean_path_helper(p: str):
 def resolve_input_file(input_path) -> tuple:
     """
     Resolve input to a single file (Excel or CSV).
-    
+
     Args:
         input_path: Path to a file or folder
-        
+
     Returns:
         (file_path, display_path) where file_path is the resolved file and display_path is for user messages
-        
+
     Raises:
         FileNotFoundError: If file/folder cannot be found or no valid file in folder
     """
     if not input_path:
         raise ValueError("Input path is required")
-    
+
     input_path = _clean_path_helper(input_path)
-    
+
     # Case 1: Direct file path
     if os.path.isfile(input_path):
         if not (input_path.endswith('.csv') or input_path.endswith('.xlsx')):
             raise ValueError(f"Input file must be .csv or .xlsx, got: {input_path}")
         return input_path, input_path
-    
+
     # Case 2: Directory path
     if os.path.isdir(input_path):
         found_file = list_input_file(input_path)
@@ -78,7 +78,7 @@ def resolve_input_file(input_path) -> tuple:
             raise FileNotFoundError(f"No .csv or .xlsx file found in folder: {input_path}")
         full_path = os.path.join(input_path, found_file)
         return full_path, full_path
-    
+
     # Case 3: Path doesn't exist
     raise FileNotFoundError(f"Input path not found: {input_path}")
 
@@ -86,19 +86,19 @@ def resolve_input_file(input_path) -> tuple:
 def resolve_output_path(input_file_path, output_spec, num_runs, num_models) -> str:
     """
     Resolve output file path from various output specifications.
-    
+
     Args:
         input_file_path: The input file path (used for naming)
         output_spec: User-specified output (file path, folder path, or None)
         num_runs: Number of runs (for filename)
         num_models: Number of models (for filename)
-        
+
     Returns:
         Full output file path ready to write to
     """
     input_file_path = _clean_path_helper(input_file_path)
     output_spec = _clean_path_helper(output_spec) if output_spec else None
-    
+
     # Default: same folder as input file
     if not output_spec:
         output_dir = os.path.dirname(input_file_path) or '.'
@@ -112,12 +112,12 @@ def resolve_output_path(input_file_path, output_spec, num_runs, num_models) -> s
     else:
         output_dir = output_spec
         os.makedirs(output_dir, exist_ok=True)
-    
+
     # Generate output filename from input filename
     base_name = os.path.splitext(os.path.basename(input_file_path))[0]
     suffix = f"{num_runs}runs_multi.xlsx" if num_models > 1 else f"{num_runs}runs.xlsx"
     output_filename = f"{base_name}_text_analysis_{suffix}"
-    
+
     return os.path.join(output_dir, output_filename)
 
 
@@ -167,6 +167,7 @@ def main():
     parser.add_argument('--id-col', help='Identifier column name')
     parser.add_argument('--content-col', help='Content column name')
     parser.add_argument('--runs', type=int, help='Number of runs per row')
+    parser.add_argument('--save-every', type=int, default=50, help='Save interim results every N rows (default: 50)')
     # Consensus flags (within-model and between-model terminology)
     grp_wm = parser.add_mutually_exclusive_group()
     grp_wm.add_argument('--within-model-consensus', dest='within_model_consensus', action='store_true', help='Force within-model consensus on')
@@ -182,11 +183,10 @@ def main():
     parser.add_argument('--between-model-consensus-mode', choices=['exact', 'set', 'fuzzy'], help='Between-model consensus mode')
     parser.add_argument('--between-model-fuzzy-threshold', type=int, help='Between-model fuzzy threshold (0-100)')
     parser.add_argument('--delay', type=float, help='Delay between model runs in seconds')
-    # Aggregation flag: aggregate AI responses for consensus across the output file
+    # Aggregation flag
     parser.add_argument('--aggregate', dest='aggregate', action='store_true', help='Aggregate AI responses for consensus across the output file')
     parser.add_argument('--no-aggregate', dest='aggregate', action='store_false', help='Do not aggregate AI responses for consensus across the output file')
     parser.set_defaults(aggregate=None)
-    # (legacy per-model/cross-model parser options removed) Use within-model / between-model flags instead above
 
     # Append metadata tri-state
     grp_meta = parser.add_mutually_exclusive_group()
@@ -206,7 +206,6 @@ def main():
                 raise
             cfg = {}
 
-    # If a config file was provided in interactive mode, confirm before silently using it
     if args.config and not args.no_interactive:
         try:
             use_cfg = input(f"Load configuration from {args.config}? (y/n) [y]: ").strip().lower()
@@ -219,7 +218,6 @@ def main():
         val = getattr(args, key.replace('-', '_'), None)
         if val is not None:
             return val
-        # Try both hyphen and underscore forms in config
         if key in cfg:
             return cfg[key]
         key_underscore = key.replace('-', '_')
@@ -227,8 +225,7 @@ def main():
             return cfg[key_underscore]
         return default
 
-
-    # Try to list available Ollama models to help the user choose
+    # Try to list available Ollama models
     try:
         models = []
         result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
@@ -242,14 +239,12 @@ def main():
     except Exception:
         models = []
 
-    # First ask whether to use a single model or compare multiple models
     suggested = ["gemma3:12b", "deepseek-ri:14b", "gpt-oss:20b"]
     cli_models = _get('models')
     models_to_run = []
     if cli_models:
         models_to_run = [m.strip() for m in str(cli_models).split(',') if m.strip()]
     else:
-        # interactive selection unless running non-interactively
         if not args.no_interactive:
             multi = input("Do you want to compare multiple models? (y/n): ").strip().lower() == 'y'
             if multi:
@@ -266,14 +261,11 @@ def main():
                     print(f"Warning: '{single_model}' not found in ollama list; proceeding with provided name.")
                 models_to_run = [single_model]
         else:
-            # non-interactive and no CLI models: use discovered or suggested
             models_to_run = models if models else suggested
 
     data_in = _get('input') or (input('Data input file or folder [.] : ').strip() if not args.no_interactive else '.')
     data_out = _get('output') or (input('Data output file or folder [same as input] : ').strip() if not args.no_interactive else None)
-    # Ensure prompt_desc is always defined (may come from CLI/config)
     prompt_desc = _get('prompt_desc') or _get('prompt-desc') or None
-    # Interactive prompt for description (only when interactive allowed)
     if not args.no_interactive:
         if data_in == '.':
             print("Tip: Using current directory ('.') as input. Specify --input <path> to use a different file/folder.")
@@ -284,55 +276,48 @@ def main():
             if resp_desc:
                 prompt_desc = resp_desc
     prompt_desc = prompt_desc or 'the main topic'
-    
-    # Clean up paths
+
     def _clean_path(p: str):
         return _clean_path_helper(p)
-    
+
     data_in = _clean_path(data_in)
     if data_out:
         data_out = _clean_path(data_out)
-    
-    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helpful. The text is:'
-    
+
+    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc}. If you tell me anything besides {prompt_desc} you will not be helpful. The text is:'
+
     # Resolve input file path
     try:
         input_file_path, _ = resolve_input_file(data_in)
     except (FileNotFoundError, ValueError) as e:
         print(f'Error: {e}')
         return
-    
+
     # Load dataframe
     print(f"Loading data from: {input_file_path}")
     df = pd.read_csv(input_file_path) if input_file_path.endswith('.csv') else pd.read_excel(input_file_path)
 
-    # columns and runs: attempt to pull from CLI/config, otherwise interactive
     id_col = _get('id_col') or None
     content_col = _get('content_col') or None
     num_runs = _get('runs') or None
     if not (id_col and content_col and num_runs):
         if args.no_interactive:
-            # require id/content/runs in config/args
             id_col = id_col or cfg.get('id_col')
             content_col = content_col or cfg.get('content_col')
             num_runs = num_runs or cfg.get('runs') or 1
         else:
             id_col, content_col, num_runs = get_user_columns(df)
 
-    # Resolve column names case-insensitively so users can input non-exact casing
     def _resolve_col_name(name):
         if not name:
             return None
-        # direct match first
         if name in df.columns:
             return name
-        # case-insensitive exact match
         exact_ci = [c for c in df.columns if c.lower() == name.lower()]
         if exact_ci:
             if len(exact_ci) > 1:
                 print(f"Warning: multiple columns match '{name}' case-insensitively. Using '{exact_ci[0]}'.")
             return exact_ci[0]
-        # startswith match (case-insensitive)
         starts = [c for c in df.columns if c.lower().startswith(name.lower())]
         if starts:
             print(f"Using column '{starts[0]}' for requested '{name}' (case-insensitive startswith).")
@@ -350,20 +335,26 @@ def main():
     if not resolved_content:
         print(f"Content column '{content_col}' not found (case-insensitive). Available columns: {list(df.columns)}. Exiting.")
         return
-    # use resolved column name for subsequent operations
     content_col = resolved_content
     contents = df[content_col].tolist()
 
-  
-    # Pre-run consensus and metadata choices (collect before long runs so non-interactive runs can proceed)
-    # Within-model consensus decision (tri-state via CLI/config). Default = True.
+    # Resolve output path early so we can use it for interim saves
+    outpath = resolve_output_path(input_file_path, data_out, num_runs, len(models_to_run))
+    output_dir = os.path.dirname(outpath) or '.'
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: could not create output directory {output_dir}: {e}")
+
+    # How often to save interim results
+    save_every = _get('save_every') or args.save_every or 50
+
+    # Pre-run consensus and metadata choices
     within_model = _get('within_model_consensus') if _get('within_model_consensus') is not None else None
     if within_model is None:
         if args.no_interactive:
-            # In non-interactive mode keep prior default (True)
             within_model = True
         else:
-            # If only one model is being used, do not prompt the user and do not run within-model consensus
             if len(models_to_run) == 1:
                 within_model = False
             else:
@@ -381,7 +372,6 @@ def main():
         except Exception:
             within_model_fuzzy = 85
 
-    # Aggregated (across response columns) decision
     aggregated_choice = _get('aggregate') if _get('aggregate') is not None else None
     if aggregated_choice is None:
         if args.no_interactive:
@@ -392,13 +382,11 @@ def main():
     else:
         aggregated_choice = True if aggregated_choice in (True, 'y', 'yes', 'Y', '1') else False
 
-    # Between-model consensus decision (tri-state). Default = True.
     between_model = _get('between_model_consensus') if _get('between_model_consensus') is not None else None
     if between_model is None:
         if args.no_interactive:
             between_model = True
         else:
-            # If only one model is selected, skip between-model consensus prompt and default to False
             if len(models_to_run) <= 1:
                 between_model = False
             else:
@@ -410,11 +398,9 @@ def main():
     between_model_mode = _get('between-model-consensus-mode') or within_model_mode
     between_model_fuzzy = _get('between-model-fuzzy-threshold') or within_model_fuzzy
 
-    # If aggregation or between-model consensus will be used, ask user for modes and thresholds now
     agg_mode = within_model_mode
     agg_fuzzy_thr = within_model_fuzzy
     if aggregated_choice:
-        # allow override via config/CLI
         agg_mode = _get('aggregated_consensus_mode') or _get('aggregate_consensus_mode') or agg_mode
         agg_fuzzy_thr = _get('aggregated_fuzzy_threshold') or _get('aggregate_fuzzy_threshold') or agg_fuzzy_thr
         if not args.no_interactive:
@@ -426,7 +412,6 @@ def main():
                 except Exception:
                     pass
 
-    # Between-model mode/threshold: ask now if applicable
     between_model_mode = _get('between-model-consensus-mode') or within_model_mode
     between_model_fuzzy = _get('between-model-fuzzy-threshold') or within_model_fuzzy
     if between_model and len(models_to_run) > 1 and not args.no_interactive:
@@ -438,14 +423,12 @@ def main():
             except Exception:
                 pass
 
-    # Append metadata to the workbook (default True)
     append_metadata = _get('append_metadata') if _get('append_metadata') is not None else None
     if append_metadata is None:
         append_metadata = True
     else:
         append_metadata = True if append_metadata in (True, 'y', 'yes', 'Y', '1') else False
 
-    # delay between model runs (useful if switching models manually)
     switch_delay = _get('delay') if _get('delay') is not None else 0.0
     if switch_delay is None:
         switch_delay = 0.0
@@ -453,8 +436,8 @@ def main():
         delay_input = input("Enter delay between model runs in seconds (e.g., 1.0) or press Enter for 0: ").strip()
         switch_delay = float(delay_input) if delay_input else 0.0
 
-    # Master dataframe: preserve Identifier and Content
-    master_df = pd.DataFrame({ 'Identifier': ids, 'Content': contents })
+    # Master dataframe
+    master_df = pd.DataFrame({'Identifier': ids, 'Content': contents})
     metadata_models = []
     analysis_start = time.time()
 
@@ -556,21 +539,42 @@ def main():
         final_order = existing + remaining
         return df_in[final_order]
 
-    def run_model_on_texts(model_name, texts, prompt_template, num_runs, ids):
+    def run_model_on_texts(model_name, texts, prompt_template, num_runs, ids, outpath, save_every=50):
+        """
+        Run model on texts using stateless generate calls (no accumulated context).
+        Saves interim results every save_every rows to protect against crashes.
+        """
         rows = []
         for idx, txt in enumerate(tqdm(texts, desc=f"{model_name} texts", unit="row", file=sys.stdout, dynamic_ncols=True), 1):
             row_responses = []
-            for run in tqdm(range(num_runs), desc="runs", unit="run", leave=False, file=sys.stdout, total=num_runs, dynamic_ncols=True):
-                try:
-                    resp = chat(model=model_name, messages=[{"role": "user", "content": f"{prompt_template} {txt}"}])
-                    cleaned = resp['message']['content'].strip().replace('\r', ' ').replace('\n', ' ')
-                    row_responses.append(cleaned)
-                except Exception as e:
-                    row_responses.append(f"Error: {e}")
-            result = { 'Identifier': ids[idx-1] }
+            # Skip empty or NaN content gracefully
+            if not txt or (isinstance(txt, float)):
+                for i in range(1, num_runs + 1):
+                    row_responses.append('')
+            else:
+                for run in tqdm(range(num_runs), desc="runs", unit="run", leave=False, file=sys.stdout, total=num_runs, dynamic_ncols=True):
+                    try:
+                        # Use generate (stateless) instead of chat to prevent context accumulation
+                        resp = generate(model=model_name, prompt=f"{prompt_template} {txt}")
+                        cleaned = resp['response'].strip().replace('\r', ' ').replace('\n', ' ')
+                        row_responses.append(cleaned)
+                    except Exception as e:
+                        row_responses.append(f"Error: {e}")
+            result = {'Identifier': ids[idx - 1]}
             for i, r in enumerate(row_responses, 1):
                 result[f"Response_{i}"] = r
             rows.append(result)
+
+            # Incremental save every save_every rows
+            if idx % save_every == 0:
+                try:
+                    interim_df = pd.DataFrame(rows)
+                    interim_path = outpath.replace('.xlsx', f'_interim_{idx}rows.xlsx')
+                    interim_df.to_excel(interim_path, index=False)
+                    print(f"\n  [Checkpoint] Saved {idx} rows to {interim_path}")
+                except Exception as e:
+                    print(f"\n  [Checkpoint] Could not save interim at row {idx}: {e}")
+
         return rows
 
     # Run models sequentially
@@ -578,43 +582,33 @@ def main():
         model = m
         print(f"\nRunning model: {model}")
         metadata_models.append(model)
-        rows = run_model_on_texts(model, contents, prompt_template, num_runs, ids)
+        rows = run_model_on_texts(model, contents, prompt_template, num_runs, ids, outpath, save_every=save_every)
         model_df = pd.DataFrame(rows)
 
-        # Defensive: drop duplicate Identifier rows from model output before merging to avoid merge multiplication
+        # Drop duplicate Identifier rows before merging
         if 'Identifier' in model_df.columns:
             model_df = model_df.drop_duplicates(subset=['Identifier'])
 
-        # rename response columns to include model name
+        # Rename response columns to include model name
         response_cols = [c for c in model_df.columns if c.lower().startswith('response')]
         renamed = {c: f"{c} ({model})" for c in response_cols}
         model_df = model_df.rename(columns=renamed)
 
-        # merge responses into master_df by Identifier
+        # Merge responses into master_df by Identifier
         master_df = master_df.merge(model_df, on='Identifier', how='left')
 
-        # compute consensus for this model block if requested (use within-model pre-run choice)
+        # Compute within-model consensus if requested
         if within_model and response_cols:
             block_cols = [renamed[c] for c in response_cols]
             consensus, confidences = compute_consensus_for_block(master_df, block_cols, mode=within_model_mode, fuzzy_threshold=within_model_fuzzy)
             master_df[f"Consensus ({model})"] = consensus
             master_df[f"Consensus_Confidence ({model})"] = confidences
 
-        # If not the last model, wait a short delay to allow model switching
         if idx < len(models_to_run) - 1 and switch_delay > 0:
             print(f"Waiting {switch_delay} seconds before next model...")
             time.sleep(switch_delay)
 
-    # After running models, reorder columns and save
-    outpath = resolve_output_path(input_file_path, data_out, num_runs, len(models_to_run))
-    
-    # Ensure output directory exists
-    output_dir = os.path.dirname(outpath) or '.'
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-    except Exception as e:
-        print(f"Warning: could not create output directory {output_dir}: {e}")
-    
+    # Reorder columns and save final output
     try:
         master_df = reorder_columns_posthoc(master_df, models_to_run, num_runs)
     except Exception as e:
@@ -624,24 +618,20 @@ def main():
     analysis_duration = analysis_end - analysis_start
     print(f"\nCombined analysis complete. Results saved to {outpath}")
 
-    # Consolidated reporting: optional aggregation + metadata append using pre-run choices
+    # Consolidated reporting: optional aggregation + metadata append
     try:
-        # Load dataframe from the saved output file so aggregation and reporting operate on the final sheet
         try:
             df_report = pd.read_excel(outpath)
         except Exception as e:
             print(f"Could not read {outpath} for reporting: {e}")
             df_report = None
 
-        # Optionally run an overall aggregation across response columns (post-hoc)
         aggregated = False
         agg_summary = {}
         if aggregated_choice and df_report is not None:
-            # Use aggregated mode and threshold chosen prior to analysis
             response_cols = [col for col in df_report.columns if re.match(r'^response_\d+', col.lower())]
             print(f"\nFound {len(response_cols)} response columns. Calculating aggregated consensus using mode={agg_mode}...")
 
-            # Use compute_consensus_for_block (supports exact/set/fuzzy)
             try:
                 aggregated_consensus, aggregated_conf = compute_consensus_for_block(df_report, response_cols, mode=agg_mode, fuzzy_threshold=agg_fuzzy_thr)
                 df_report["Aggregated_Consensus"] = aggregated_consensus
@@ -661,20 +651,16 @@ def main():
                 }
                 aggregated = True
 
-                # Save back the consensus columns to the output file
                 try:
                     df_report.to_excel(outpath, index=False)
                     print(f"\nAggregated consensus calculation complete. Results written to {outpath}")
                 except Exception as e:
                     print(f"Could not write aggregated consensus to {outpath}: {e}")
 
-            # If multiple models were used, optionally compute between-model consensus across within-model Consensus columns
             between_model_done = False
             if between_model and len(metadata_models) > 1:
-                # build within-model consensus column list (only include those present)
                 within_model_cons_cols = [f"Consensus ({m})" for m in metadata_models if f"Consensus ({m})" in df_report.columns]
                 if not within_model_cons_cols:
-                    # fallback: try any column that starts with 'consensus ('
                     within_model_cons_cols = [c for c in df_report.columns if c.lower().startswith('consensus (')]
                 if within_model_cons_cols:
                     print(f"Running between-model consensus on columns: {within_model_cons_cols}")
@@ -688,7 +674,6 @@ def main():
                         print(f"Between-model consensus failed: {e}")
                 else:
                     print("No within-model consensus columns found for between-model aggregation.")
-                # save after between-model consensus if added
                 if between_model_done:
                     try:
                         df_report.to_excel(outpath, index=False)
@@ -696,61 +681,62 @@ def main():
                     except Exception as e:
                         print(f"Could not save between-model consensus to {outpath}: {e}")
 
-        # Build reporting metadata and append to the bottom of the workbook
-        try:
-            from openpyxl import load_workbook
-            wb = load_workbook(outpath)
-            ws = wb.active
-            if ws is None:
-                raise ValueError("Could not access worksheet")
-            ws.append([])
-            ws.append(["Prompt used:", prompt_template])
-            ws.append(["Models used:", ', '.join(metadata_models)])
-            ws.append([f"Runs per row: {num_runs}"])
-            ws.append([f"Delay between model runs: {switch_delay} seconds"])
-            ws.append([f"Within-model consensus enabled during runs: {within_model}"])
-            ws.append([f"Within-model consensus mode: {within_model_mode}"])
-            if within_model_mode == 'fuzzy':
-                ws.append([f"Within-model fuzzy threshold: {within_model_fuzzy}"])
-            hours, rem = divmod(analysis_duration, 3600)
-            minutes, seconds = divmod(rem, 60)
-            ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
-
-            # If we ran the aggregated consensus, add that summary
-            if aggregated:
-                ws.append([])
-                ws.append(["Aggregated consensus across response columns:"])
-                ws.append([f"High confidence (≥70%): {agg_summary.get('high', 0)} rows"])
-                ws.append([f"Medium confidence (40-69%): {agg_summary.get('medium', 0)} rows"])
-                ws.append([f"Low confidence (<40%): {agg_summary.get('low', 0)} rows"])
-                if agg_summary.get('low', 0) > 0:
-                    ws.append(["Rows with low confidence may require manual review:"])
-                    low_rows = agg_summary.get('low_rows')
-                    if low_rows is not None:
-                        for idx, row in low_rows.iterrows():
-                            id_display = row.get('Identifier', idx + 1)
-                            conf_col = 'Aggregated_Consensus_Confidence' if 'Aggregated_Consensus_Confidence' in row else 'Consensus_Confidence'
-                            try:
-                                conf_val = row[conf_col]
-                                ws.append([f"Row {idx + 1}: {id_display} (confidence: {conf_val:.1%})"])
-                            except Exception:
-                                ws.append([f"Row {idx + 1}: {id_display} (confidence: unknown)"])
-
-            # CPU/GPU info
+        # Append metadata to workbook
+        if append_metadata:
             try:
-                import cpuinfo
-                cpu = cpuinfo.get_cpu_info()
-                cpu_brand = cpu.get('brand_raw', 'Unknown CPU')
-            except Exception:
-                cpu_brand = platform.processor() or platform.machine() or 'Unknown CPU'
-            ws.append([f"CPU: {cpu_brand}"])
-            gpu_report = detect_gpus(cpu_brand)
-            ws.append([f"GPU: {gpu_report}"])
+                from openpyxl import load_workbook
+                wb = load_workbook(outpath)
+                ws = wb.active
+                if ws is None:
+                    raise ValueError("Could not access worksheet")
+                ws.append([])
+                ws.append(["Prompt used:", prompt_template])
+                ws.append(["Models used:", ', '.join(metadata_models)])
+                ws.append([f"Runs per row: {num_runs}"])
+                ws.append([f"Save-every interval: {save_every} rows"])
+                ws.append([f"Delay between model runs: {switch_delay} seconds"])
+                ws.append([f"Context mode: stateless (generate)"])
+                ws.append([f"Within-model consensus enabled during runs: {within_model}"])
+                ws.append([f"Within-model consensus mode: {within_model_mode}"])
+                if within_model_mode == 'fuzzy':
+                    ws.append([f"Within-model fuzzy threshold: {within_model_fuzzy}"])
+                hours, rem = divmod(analysis_duration, 3600)
+                minutes, seconds = divmod(rem, 60)
+                ws.append([f"Duration: {int(hours)}h {int(minutes)}m {seconds:.1f}s"])
 
-            wb.save(outpath)
-            print(f"Reporting information appended to {outpath}")
-        except Exception as e:
-            print(f"Could not append reporting metadata (while adding reporting information to the Excel file): {e}")
+                if aggregated:
+                    ws.append([])
+                    ws.append(["Aggregated consensus across response columns:"])
+                    ws.append([f"High confidence (>=70%): {agg_summary.get('high', 0)} rows"])
+                    ws.append([f"Medium confidence (40-69%): {agg_summary.get('medium', 0)} rows"])
+                    ws.append([f"Low confidence (<40%): {agg_summary.get('low', 0)} rows"])
+                    if agg_summary.get('low', 0) > 0:
+                        ws.append(["Rows with low confidence may require manual review:"])
+                        low_rows = agg_summary.get('low_rows')
+                        if low_rows is not None:
+                            for row_idx, row in low_rows.iterrows():
+                                id_display = row.get('Identifier', row_idx + 1)
+                                conf_col = 'Aggregated_Consensus_Confidence' if 'Aggregated_Consensus_Confidence' in row else 'Consensus_Confidence'
+                                try:
+                                    conf_val = row[conf_col]
+                                    ws.append([f"Row {row_idx + 1}: {id_display} (confidence: {conf_val:.1%})"])
+                                except Exception:
+                                    ws.append([f"Row {row_idx + 1}: {id_display} (confidence: unknown)"])
+
+                try:
+                    import cpuinfo
+                    cpu = cpuinfo.get_cpu_info()
+                    cpu_brand = cpu.get('brand_raw', 'Unknown CPU')
+                except Exception:
+                    cpu_brand = platform.processor() or platform.machine() or 'Unknown CPU'
+                ws.append([f"CPU: {cpu_brand}"])
+                gpu_report = detect_gpus(cpu_brand)
+                ws.append([f"GPU: {gpu_report}"])
+
+                wb.save(outpath)
+                print(f"Reporting information appended to {outpath}")
+            except Exception as e:
+                print(f"Could not append reporting metadata: {e}")
 
     except Exception as e:
         import traceback
@@ -761,30 +747,21 @@ def main():
 def detect_gpus(cpu_brand):
     """
     Detects GPU information based on the current platform.
-
     Returns a string describing integrated and detected GPUs.
-
-    Note:
-        - On Windows, uses WMIC; on Linux, uses lspci; on macOS, uses system_profiler.
-        - May return 'Not detected' if no GPU is found or if required system commands are unavailable.
-        - Exceptions may occur if subprocess calls fail or required utilities are missing.
     """
     gpu_info = None
     integrated_gpu = None
-    # Check for integrated GPU by CPU brand
     for brand in ["Radeon", "NVIDIA", "Intel Graphics", "Iris", "GeForce", "RTX", "GTX"]:
         if brand.lower() in cpu_brand.lower():
             integrated_gpu = cpu_brand
             break
     try:
         if sys.platform.startswith('win'):
-            # Windows: Use WMIC to get GPU names
             gpu_result = subprocess.run(['wmic', 'path', 'win32_VideoController', 'get', 'name'], capture_output=True, text=True)
             gpu_lines = gpu_result.stdout.splitlines()
             gpus = [line.strip() for line in gpu_lines if line.strip() and 'Name' not in line]
             gpu_info = ', '.join(gpus) if gpus else None
         elif sys.platform.startswith('linux'):
-            # Linux: Use lspci to get VGA and 3D controller info
             gpu_result = subprocess.run('lspci | grep -i vga', shell=True, capture_output=True, text=True)
             gpus = [line for line in gpu_result.stdout.splitlines() if line]
             gpu_info = ', '.join(gpus) if gpus else None
@@ -793,7 +770,6 @@ def detect_gpus(cpu_brand):
             if gpus_3d:
                 gpu_info = gpu_info + ', ' + ', '.join(gpus_3d) if gpu_info else ', '.join(gpus_3d)
         elif sys.platform == 'darwin':
-            # macOS: Use system_profiler to get GPU info
             gpu_result = subprocess.run(['system_profiler', 'SPDisplaysDataType', '-detailLevel', 'mini'], capture_output=True, text=True)
             gpus = [line.strip() for line in gpu_result.stdout.splitlines() if 'Chipset Model:' in line or 'Vendor:' in line]
             gpu_info = ', '.join(gpus) or None
@@ -805,6 +781,7 @@ def detect_gpus(cpu_brand):
     if gpu_info:
         all_gpus.append(f"Detected GPU(s): {gpu_info}")
     return ', '.join(all_gpus) if all_gpus else 'Not detected'
+
 
 if __name__ == '__main__':
     main()
