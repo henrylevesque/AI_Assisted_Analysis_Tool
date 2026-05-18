@@ -1,42 +1,44 @@
 # Example YAML config for image_analysis.py
-# Save this as image_config.yaml and run: python image_analysis.py --config image_config.yaml --no-interactive
+# Run with: python image_analysis.py --config image_config.yaml --no-interactive
 
-# Models to use (vision-capable models from ollama)
-use_multiple_models: true
+# Vision-capable models to use (one or more from ollama)
 models:
-  - gemma3:12b
   - llava:13b
+  - llama3.2-vision:11b
 
-# What to look for in images
+# What to look for in the images
 type_of_analysis: "objects and materials"
 
-# Input/output paths:
-# - input: Image file path (e.g., ./data/photo.jpg) or folder path (e.g., ./data/images/)
-# - output: File path (e.g., ./results.xlsx), folder path (e.g., ./results/), or leave empty/null to use input folder
+# Input/output paths
+# input:  single image file or folder of images
+# output: file path, folder path, or omit to save alongside the input images
 input: "./data/images/"
 output: "./data/image_results/"
 
-# Number of times to run each image through each model (for consensus across runs)
+# Number of times to run each image through each model (used for within-model consensus)
 runs: 5
 
-# Within-model consensus: compute consensus across the multiple runs of same model on same image
-within_model_consensus: true
-within_model_consensus_mode: "fuzzy"  # exact, set, or fuzzy
-within_model_fuzzy_threshold: 85      # 0-100, higher = stricter matching
+# Ollama reliability settings
+timeout: 180    # vision models can be slower — increase if you hit timeout errors
+retries: 2      # number of retry attempts on failure (exponential backoff)
 
-# Between-model consensus: compute consensus across per-model results (only used with 2+ models)
+# Within-model consensus: compare N runs of the same model on the same image
+within_model_consensus: true
+within_model_consensus_mode: "fuzzy"   # exact | set | fuzzy
+within_model_fuzzy_threshold: 85       # 0–100, higher = stricter
+
+# Between-model consensus: compare per-model Consensus columns (requires 2+ models)
 between_model_consensus: true
 between_model_consensus_mode: "exact"
 between_model_fuzzy_threshold: 85
 
-# Aggregated consensus: compute consensus across ALL response columns (independent from between-model)
-# Useful for treating all runs from all models together
+# Aggregate consensus: compare ALL response columns together (independent from between-model)
 aggregate: false
 aggregated_consensus_mode: "exact"
 aggregated_fuzzy_threshold: 85
 
-# Delay in seconds between switching models (useful if your GPU needs rest)
+# Delay in seconds between switching models
 delay: 0.5
 
-# Append metadata sheet to Excel output (prompt, models, duration, CPU/GPU info, etc.)
+# Append metadata to the Excel output (prompt, models, duration, CPU/GPU info, etc.)
 append_metadata: true

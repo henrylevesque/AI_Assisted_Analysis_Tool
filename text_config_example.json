@@ -1,7 +1,5 @@
 {
-  "_comment": "Example JSON config for text_analysis.py. Save as text_config.json and run: python text_analysis.py --config text_config.json --no-interactive",
-  "_instructions": "input and output paths: input can be a file or folder; output can be a file, folder, or null (uses input folder)",
-  "use_multiple_models": false,
+  "_comment": "Example JSON config for text_analysis.py. Run with: python text_analysis.py --config text_config.json --no-interactive",
   "models": ["gemma3:12b"],
   "prompt_desc": "Main topic or theme",
   "input": "./data/text_input/abstracts.xlsx",
@@ -9,6 +7,8 @@
   "id_col": "id",
   "content_col": "abstract",
   "runs": 5,
+  "timeout": 120,
+  "retries": 2,
   "within_model_consensus": true,
   "within_model_consensus_mode": "fuzzy",
   "within_model_fuzzy_threshold": 85,

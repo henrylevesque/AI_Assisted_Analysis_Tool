@@ -1,437 +1,350 @@
-# AI Assisted Analysis Tool - Technical Documentation
+# AI Assisted Analysis Tool: Technical Documentation
 
-## Executive Summary
-This document provides technical reference material for developers and researchers using the AI Assisted Analysis Tool. It covers architecture, model selection rationale, data management, the consensus algorithm, and troubleshooting. For a quick start (clone, install, run) and user-oriented overview, see [README.md](README.md).
-
-## Getting Started
-For a short quick-start guide (clone, install, run), see [README.md](README.md). This document is focused on implementation details, configuration, and internal workflows.
+This document is technical reference material for the AI Assisted Analysis Tool. It covers architecture, model selection, prompt design, the consensus algorithm, output format, and troubleshooting. For a quick-start guide and command reference, see [README.md](README.md). For ready-to-use prompt values, see [PROMPTS.md](PROMPTS.md).
 
 ---
 
-This document provides detailed technical information about the AI Assisted Analysis Tool, including implementation details, model choices, data management strategies, and workflow processes.
-
 ## Table of Contents
+
 1. [Model Selection and Performance](#model-selection-and-performance)
-2. [Data Management Strategy](#data-management-strategy)
+2. [Prompt Design](#prompt-design)
 3. [Project Architecture](#project-architecture)
 4. [Package Dependencies](#package-dependencies)
-5. [Workflow Processes](#workflow-processes)
-6. [Consensus Algorithm](#consensus-algorithm)
-7. [File Structure](#file-structure)
-8. [Troubleshooting](#troubleshooting)
+5. [Consensus Algorithm](#consensus-algorithm)
+6. [Output Format](#output-format)
+7. [Troubleshooting](#troubleshooting)
+8. [Version History](#version-history)
+
+---
 
 ## Model Selection and Performance
-The Gemma family of LLMs responds well to the project's prompt structure. Gemma2 and Gemma3 are recommended for text analysis; Gemma3 (12B variant) performs well with images.
 
-### Model Evaluation Process
-The model selection process involved testing several LLMs available through Ollama.
+### Text Analysis
 
-- **TinyLlama**: Initially tested as the smallest available model but produced inconsistent and unreliable results.
-- **Llama3.3**: Provided high-quality outputs but was too resource-intensive and slow for batch processing.
-- **Gemma2 (9B)**: Selected as the default model for text analysis due to a balance of performance and efficiency.
-  - Default quantization (9B parameters)
-  - Strong instruction following
-  - Reasonable processing speed for bulk analysis
-  - Consistent output quality
-- **Gemma3 (12B)**: Selected as the default model for image analysis because it balances vision capability and performance.
-  - Default quantization (12B parameters)
-  - Strong instruction following
-  - Reasonable processing speed for image analysis
-  - Consistent output quality
+The Gemma family of models responds well to this tool's prompt structure. Gemma3 (12B) is the current recommended default for text analysis due to its strong instruction-following and reasonable speed on consumer hardware.
 
-#### Summary
-Gemma models tend to perform better than Llama models at following instructions and avoiding extraneous information for text analysis. GPT-OSS also performs well for text, but due to its size it runs slowly on CPU- or GPU-limited machines. For image analysis, Gemma models perform well; vision capability is generally available at larger parameter sizes (Gemma3). Llava and Llama vision models did not perform well in testing — they often produced irrelevant explanations or had difficulty parsing images.
+Models evaluated:
 
-In general, using the smallest model that meets quality requirements yields the best performance trade-off. A 4-billion-parameter version of Gemma3 can give more consistent results with the project's prompt structure than larger models from other labs.
+- **TinyLlama**: Too small; inconsistent and unreliable results.
+- **Llama3.3**: High-quality outputs but too resource-intensive for batch processing.
+- **Gemma2 (9B)**: Previously used default. Strong instruction-following, good throughput.
+- **Gemma3 (12B)**: Current recommended default. Better instruction adherence than Gemma2, particularly for structured output tasks.
+- **DeepSeek-R1 (14B)**: Performs well for analytical tasks; slower than Gemma3 on GPU-limited hardware.
+- **Qwen3 (14B)**: Good results for structured extraction; comparable to Gemma3.
 
-### Prompt Structure
-The analysis code relies on a prompt structure of data description followed by a positive prompt, a negative prompt, and then a second negative prompt telling the model it will not be helpful if it does not follow the prompt. Through testing, the second negative prompt has been useful for Gemma models which really want to be helpful. 
+In general, using the smallest model that meets your quality bar gives the best performance trade-off. A 4B-parameter Gemma3 can give more consistent results with this tool's prompt structure than larger models from other labs.
 
-The text
- - 'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helptful. The text is:'
+### Image Analysis
 
-### Model Configuration
-```python
-# Model call configuration used throughout the project
-response = chat(model="gemma2", messages=[
-    {
-        "role": "user",
-        "content": f"{prompt} {content}"
-    }
-])
+Vision capability is generally available at larger parameter sizes. Recommended vision models:
+
+- **llava:13b**: Reliable general-purpose vision; good balance of speed and quality.
+- **llama3.2-vision:11b**: Strong instruction following for structured image tasks.
+- **qwen2.5vl:7b**: Efficient option for simpler classification tasks.
+- **gemma3:12b**: Vision-capable; performs well for design and spatial analysis.
+
+Note: smaller vision models (7B and below) often struggle with complex scene descriptions or fine-grained object identification. If quality is critical, use 13B+ models.
+
+---
+
+## Prompt Design
+
+### Structure
+
+Both analysis scripts use a three-part prompt structure that has proven effective for local models, particularly the Gemma family:
+
+**Text analysis prompt:**
+```
+I am going to give you a chunk of text.
+Please identify {prompt_desc} used in the text.
+Do not tell me anything besides {prompt_desc}.
+If you tell me anything besides {prompt_desc} you will not be helpful.
+The text is: {content}
 ```
 
-## Data Management Strategy
-
-### Folder Structure
-The project uses a clear separation between code and data to enable sharing while protecting sensitive information:
-
+**Image analysis prompt:**
 ```
-AI_Assisted_Analysis_Tool/
-├── Data_Input/          # User places CSV/Excel files here
-├── Data_Output/         # Generated analysis results
-├── other_analysis/      # Analysis scripts
-├── python_for_Zotero_abstracts/  # Zotero-specific tools
-└── requirements.txt     # Python dependencies
+You are a design expert in a design review. You will be shown an image.
+Please tell me {type_of_analysis} concisely and only return {type_of_analysis}.
+If multiple items are present, separate them with commas.
+If you tell me anything other than {type_of_analysis}, you will not be helpful.
 ```
 
-### Data Privacy
-- **Local Processing**: All analysis runs locally using Ollama.
-- **No Cloud Dependencies**: Data does not leave the local machine.
-- **Institutional Compliance**: Designed for environments with strict data handling requirements.
-- **Reproducible**: Code can be shared without exposing research data.
+### Why this structure works
+
+The prompt has three parts:
+1. **Positive instruction**: what to return.
+2. **Negative instruction**: what not to return.
+3. **Helpfulness framing**: telling the model that off-task output makes it unhelpful.
+
+The third part is particularly effective with Gemma variants and other RLHF-tuned models. These models are trained to be helpful assistants, so telling them that extra output is unhelpful suppresses preambles, explanations, and hedging.
+
+### Prompt customization
+
+The `prompt_desc` (text) and `type_of_analysis` (image) values are the only user-facing inputs to the prompt. See [PROMPTS.md](PROMPTS.md) for a curated library of values covering common research tasks.
+
+---
 
 ## Project Architecture
 
-### Core Components
+### Core scripts
 
-#### 1. Text Analysis Engine (`text_analysis.py`)
-- **Purpose**: Analyze tabular data (CSV or Excel) using configurable LLM models.
-- **Input Modes**: Single file or folder of files.
-- **Features**: 
-  - User-defined prompts and custom templates
-  - Column selection and flexible identifier handling
-  - Multiple runs per row for reliability
-  - Three independent consensus types: within-model, between-model, and aggregated
-- **Output**: Excel files with all responses and consensus metrics.
+#### `text_analysis.py`
+- **Input**: CSV or Excel file with an identifier column and a text content column.
+- **Process**: Sends each row's content to one or more Ollama models, N times each (runs).
+- **Output**: Excel file with all response columns plus optional consensus columns and metadata.
 
-#### 2. Image Analysis Engine (`image_analysis.py`)
-- **Purpose**: Analyze images using vision-capable LLM models.
-- **Input Modes**: Single image or folder of images.
-- **Features**: 
-  - Vision-enabled model support (e.g., Gemma3 vision)
-  - Multiple runs per image
-  - Multiple model support for comparison
-  - Three independent consensus types
-- **Output**: Excel files with image metadata and consensus results.
+#### `image_analysis.py`
+- **Input**: A single image file or a folder of images (JPG, PNG, BMP, TIFF, GIF, WebP).
+- **Process**: Sends each image to one or more Ollama models, N times each (runs).
+- **Output**: Excel file with response and consensus columns, and optional metadata.
 
-#### 3. Flexible Input/Output Handling
-Both main analysis scripts support:
-- **Input**: Single file, folder of files, or interactive path selection
-- **Output**: Direct file path, output folder, or automatic placement (defaults to input location)
-- **Path Resolution**: Intelligent handling of quoted paths and whitespace cleanup
+### Configuration system
 
-#### 4. Zotero-Specific Tools (Optional)
-Individual scripts for common bibliographic analysis tasks:
-- `theory.py` - Urban planning theory identification
-- `methods.py` - Research methodology extraction
-- `results.py` - Results summarization
-- `location.py` - Geographic location identification
-- `n_themes.py` - Theme extraction
+Settings are resolved in this priority order (highest wins):
+
+```
+CLI arguments  >  config file (YAML/JSON)  >  built-in defaults
+```
+
+Config files support both YAML and JSON formats. The `--config` flag loads a config file; `--no-interactive` suppresses all prompts so the run is fully automated.
+
+### Ollama integration
+
+Both scripts use `ollama.Client` with a configurable timeout (default: 120s) and call `client.generate()` (the raw completion endpoint, not `client.chat()`). This has lower overhead and avoids prepending a system/conversation context.
+
+Failed calls are retried with exponential backoff (default: 2 retries, delays of 2s and 4s).
+
+---
 
 ## Package Dependencies
 
-### Core Requirements
 ```
-ollama==0.3.3          # AI model client
-pandas==2.2.3          # Data manipulation
-tqdm==4.66.6           # Progress bars
-openpyxl==3.1.5        # Excel file support
+ollama>=0.4.0        # Ollama Python client (generate API)
+pandas>=2.0.0        # Data loading and manipulation
+openpyxl>=3.1.0      # Excel read/write
+tqdm>=4.60.0         # Progress bars
+py-cpuinfo>=9.0.0    # CPU info for metadata reporting
+rapidfuzz>=3.0.0     # Fuzzy string matching (optional; required for fuzzy consensus mode)
+pyyaml>=6.0          # YAML config file parsing
 ```
 
-### Installation Resolution
-Recent updates fixed package naming issues:
-- **Issue**: `requirements.txt` originally contained `ollama_python`
-- **Solution**: Updated to correct package name `ollama`
-- **Addition**: Added `openpyxl` for robust Excel file handling
+### Virtual environment setup
 
-### Virtual Environment Setup
-```bash
-# Create virtual environment
+```powershell
+# Create and activate
 python -m venv venv
-
-# Activate (Windows)
 .\venv\Scripts\activate.bat
 
-# Install dependencies
+# Install
 pip install -r requirements.txt
 
-# Install Ollama model
-ollama pull gemma2
+# Pull a model
+ollama pull gemma3:12b       # text analysis
+ollama pull llava:13b        # image analysis
 ```
 
-## Workflow Processes
-
-### Standard Analysis Workflow (Text & Image Analysis)
-
-```mermaid
-graph TD
-    A[Start] --> B[Resolve Input Path]
-    B --> C{Single File or Folder?}
-    C -->|Single File| D[Load Single File]
-    C -->|Folder| E[Load All Files/Images]
-    D --> F[User Configuration Prompts]
-    E --> F
-    F --> G[Configure Consensus Types]
-    G --> H{Within-Model Consensus}
-    H -->|Enabled| I[Multiple Runs per Item]
-    H -->|Disabled| J[Single Run per Item]
-    I --> K[Send to AI Model]
-    J --> K
-    K --> L[Collect Responses]
-    L --> M{Between-Model Consensus}
-    M -->|Enabled & Multiple Models| N[Calculate Per-Model Consensus]
-    M -->|Otherwise| O{Aggregated Consensus}
-    N --> O
-    O -->|Enabled| P[Calculate Aggregated Consensus]
-    O -->|Disabled| Q[Finalize Results]
-    P --> Q
-    Q --> R[Resolve Output Path]
-    R --> S[Write to Excel with Metadata]
-    S --> T[End]
-
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style C fill:#fff3e0
-    style F fill:#f3e5f5
-    style G fill:#f3e5f5
-    style H fill:#fff3e0
-    style M fill:#fff3e0
-    style O fill:#fff3e0
-    style R fill:#f3e5f5
-    style T fill:#e1f5fe
-```
-
-### Process Flow Details
-
-1. **Input Resolution**
-   - Intelligently handle single files or folders
-   - Support for quoted paths and whitespace cleanup
-   - Auto-detect file types (CSV, Excel, images)
-
-2. **Configuration**
-   - Interactive prompts for all settings or config file input
-   - CLI argument support for scripting
-   - Config precedence: CLI args -> config file -> built-in defaults
-
-3. **Analysis Execution**
-   - Configurable number of runs per item (for within-model consensus)
-   - Multiple model support (for between-model consensus)
-   - Progress tracking with `tqdm` progress bars
-   - Error handling and logging for failed AI requests
-
-4. **Consensus Calculation** (Three Independent Types)
-   - **Within-Model Consensus**: Aggregates multiple runs using same model
-     - Modes: exact (text match), set (unordered tokens), fuzzy (similarity-based)
-     - Produces: `Consensus_{ModelName}` and `Consensus_Confidence_{ModelName}` columns
-   - **Between-Model Consensus**: Aggregates per-model consensus results (only if 2+ models)
-     - Modes: exact, set, fuzzy (independently configurable)
-     - Produces: `BetweenModel_Consensus` and `BetweenModel_Consensus_Confidence` columns
-   - **Aggregated Consensus**: Independent consensus across ALL response columns
-     - Modes: exact, set, fuzzy (independently configurable)
-     - Produces: `Aggregated_Consensus` and `Aggregated_Consensus_Confidence` columns
-
-5. **Output Generation**
-   - Excel files with all original responses preserved
-   - Additional consensus columns with confidence metrics (based on enabled types)
-   - Summary statistics for quality assessment
-   - Analysis metadata (models used, run counts, duration, CPU/GPU info)
-   - Flexible output path options
+---
 
 ## Consensus Algorithm
 
-### Algorithm Overview
-The consensus mechanism uses three independent, configurable approaches to identify agreement across multiple AI responses. Each consensus type can be configured independently with different algorithms and parameters.
+### Overview
 
-### Consensus Modes
+The tool computes up to three independent consensus types. Each type operates on a different set of columns and can be enabled or disabled independently.
 
-#### 1. Exact Match Mode
-- Finds responses that match completely
-- Most restrictive; suitable for categorical or structured responses
-- Confidence = (count of most frequent response) / (total responses)
+| Type | Input columns | Output columns | Default |
+|------|--------------|----------------|---------|
+| Within-model | `Response_1 (m)` … `Response_N (m)` per model | `Consensus (m)`, `Confidence (m)` | ON when runs > 1 |
+| Between-model | `Consensus (m1)`, `Consensus (m2)`, … | `Between_Consensus`, `Between_Confidence` | ON when 2+ models |
+| Aggregate | All `Response_X (m)` columns | `Aggregate_Consensus`, `Aggregate_Confidence` | OFF |
 
-#### 2. Set Mode (Unordered Token Matching)
-- Normalizes and tokenizes responses
-- Treats responses as sets of words/tokens
-- Calculates agreement based on shared tokens
-- More flexible than exact match; suitable for variable phrasing
-- Confidence = (shared tokens across responses) / (total unique tokens)
+### Consensus modes
 
-#### 3. Fuzzy Match Mode
-- Uses token-based similarity matching (via rapidfuzz library)
-- Configurable threshold (0.0-1.0) for similarity requirement
-- Most flexible; handles paraphrasing and minor variations
-- Best for natural language responses
-- Confidence = (average similarity of matched responses) / (total responses)
+#### Exact mode
 
-### Step-by-Step Process (Set Mode Example)
+Normalizes all responses (lowercase, strip punctuation, collapse whitespace) then picks the most frequent value. Best for short, discrete labels.
 
-1. **Response Normalization**
-   ```python
-   normalized_responses = [set(re.split(r'\s+', str(r).lower().strip())) for r in responses]
-   ```
+```
+Confidence = count(most_frequent) / total_responses
+```
 
-2. **Token Analysis**
-   ```python
-   all_tokens = set().union(*normalized_responses)
-   token_agreement = {token: sum(1 for r in normalized_responses if token in r) for token in all_tokens}
-   ```
+#### Set mode
 
-3. **Consensus Identification**
-   ```python
-   consensus_tokens = [token for token, count in token_agreement.items() if count > total_responses // 2]
-   ```
+Splits each response on commas and semicolons, normalizes each token, then keeps items that appear in more than 50% of responses. Best for comma-separated lists (themes, keywords).
 
-4. **Confidence Calculation**
-   ```python
-   confidence = len(consensus_tokens) / len(all_tokens)
-   ```
+```
+Confidence = mean(frequency_of_kept_items) / total_responses
+```
 
-### Confidence Levels
-- **High Confidence (>=70%)**: Strong agreement across responses.
-- **Medium Confidence (40–69%)**: Moderate agreement; generally reliable.
-- **Low Confidence (<40%)**: Poor agreement; requires manual review.
+#### Fuzzy mode
 
-### Edge Cases Handled
-- **Single Response**: Automatic confidence of 100%.
-- **No Consensus Found**: Falls back to the most frequent complete response.
-- **Empty/Error Responses**: Handled gracefully with confidence score of 0%.
-- **Disabled Consensus Type**: Column not generated if consensus type is disabled.
+Groups responses using `rapidfuzz.fuzz.token_set_ratio`. Responses with similarity ≥ threshold are grouped together; the largest group wins. Best for free-text descriptions that may be paraphrased.
 
-## File Structure
+```
+Confidence = size(largest_group) / total_responses
+```
 
-### Input Files
+Recommended threshold: 80–90. Lower values merge more aggressively; higher values are stricter.
 
-**Text Analysis:**
-- **CSV Format**: Standard comma-separated values with configurable columns
-- **Excel Format**: .xlsx files with flexible sheet and column selection
-- **Input Modes**: 
-  - Single file: `python text_analysis.py --input path/to/file.csv`
-  - Folder: `python text_analysis.py --input path/to/folder/`
-  - Interactive: Script prompts for path if not specified
-- **Column Flexibility**: Any column can serve as identifier, content, or be skipped
+### Confidence levels
 
-**Image Analysis:**
-- **Supported Formats**: JPG, PNG, TIFF, BMP, GIF, WebP
-- **Input Modes**:
-  - Single image: `python image_analysis.py --input path/to/image.jpg`
-  - Folder of images: `python image_analysis.py --input path/to/images/`
-  - Interactive: Script prompts for path if not specified
+| Level | Range | Interpretation |
+|-------|-------|---------------|
+| High | ≥ 70% | Strong agreement; generally reliable |
+| Medium | 40–69% | Moderate agreement; check borderline rows |
+| Low | < 40% | Poor agreement; manual review recommended |
 
-### Output Files
+### Edge cases
 
-**Naming Convention:**
-- Single file input: `{original_filename}_{analysis_type}_{runs}runs_{models}model.xlsx`
-- Folder input: `AI_Analysis_{timestamp}_{runs}runs_{models}model.xlsx`
+- **Single response**: Confidence = 1.0 (trivially).
+- **All empty responses**: Consensus = `''`, confidence = 0.0.
+- **No majority in exact mode**: Most frequent value is used regardless of its share.
+- **No items reach 50% threshold in set mode**: Most frequent item is used as fallback.
 
-**Output Path Options:**
-- Direct file path: `--output /path/to/output.xlsx` (creates file at specified location)
-- Folder path: `--output /path/to/folder/` (auto-generates filename in folder)
-- None/Auto: Output placed in same directory as input file (default behavior)
+---
 
-### Output Columns
+## Output Format
 
-**Always Present:**
-| Column | Description |
-|--------|------------|
-| `Identifier` | Row/image identifier (user-selected or auto-generated) |
-| `Content` | Original content/image name that was analyzed |
-| `Response_1` to `Response_N` | Individual AI responses per run |
+### Column ordering
 
-**Conditional (Based on Configuration):**
-| Column | Description | When Present |
-|--------|------------|-----------|
-| `Consensus_{ModelName}` | Within-model consensus result | If within_model=true & num_models > 1 |
-| `Consensus_Confidence_{ModelName}` | Within-model confidence (0.0–1.0) | If within_model=true & num_models > 1 |
-| `BetweenModel_Consensus` | Between-model consensus result | If between_model=true & num_models > 1 |
-| `BetweenModel_Consensus_Confidence` | Between-model confidence (0.0–1.0) | If between_model=true & num_models > 1 |
-| `Aggregated_Consensus` | Consensus across all responses | If aggregate=true |
-| `Aggregated_Consensus_Confidence` | Aggregated confidence (0.0–1.0) | If aggregate=true |
+Columns are written in this order:
+
+1. `Identifier` / `Image` (row or image identifier)
+2. `Content` (original text; text analysis only)
+3. `Response_1 (model)` ... `Response_N (model)` (one column per run per model)
+4. `Consensus (model)`, `Confidence (model)` (per-model within-model consensus)
+5. `Between_Consensus`, `Between_Confidence` (cross-model consensus, if enabled)
+6. `Aggregate_Consensus`, `Aggregate_Confidence` (aggregate consensus, if enabled)
+
+### Metadata sheet
+
+When `append_metadata: true`, the following is appended below the data:
+
+- Prompt used
+- Models used
+- Runs per row/image
+- Delay between model runs
+- Timeout and retry settings
+- Consensus settings (type, mode, threshold) for each enabled type
+- Duration
+- Aggregate confidence distribution (if aggregate was run)
+- CPU and GPU information
+
+### Reporting in Excel
+
+To count and rank unique values in a consensus column:
+
+```excel
+=SORT(HSTACK(UNIQUE(A2:A100), COUNTIF(A2:A100, UNIQUE(A2:A100))), 2, -1)
+```
+
+This returns a two-column sorted table of (value, count) pairs that can be used to build a bar chart.
+
+---
 
 ## Troubleshooting
 
-### Common Issues and Solutions
+### Ollama not found or not running
 
-#### Import Errors
-**Problem**: `ModuleNotFoundError` for packages  
-**Solution**:
-```bash
-# Ensure virtual environment is activated
+```powershell
+# Start Ollama
+ollama serve
+
+# Verify a model is available
+ollama list
+
+# Pull a model if needed
+ollama pull gemma3:12b
+```
+
+### Timeout errors
+
+Increase `--timeout` (default: 120s). Vision models on CPU-only machines may need 300s or more.
+
+```powershell
+python image_analysis.py --config my_config.yaml --timeout 300 --no-interactive
+```
+
+### Model produces verbose or off-topic responses
+
+1. Try a different model; Gemma3 and DeepSeek-R1 follow the prompt structure most reliably.
+2. Use fuzzy consensus to tolerate minor variations in otherwise on-topic responses.
+3. Increase runs; a wider sample gives more reliable consensus.
+
+### Import errors
+
+```powershell
+# Ensure virtual environment is active
 .\venv\Scripts\activate.bat
 
-# Reinstall requirements
+# Reinstall
 pip install -r requirements.txt
 ```
 
-#### Ollama Connection Issues
-**Problem**: Cannot connect to Ollama service  
-**Solution**:
-```bash
-# Ensure Ollama is running
-ollama serve
+### rapidfuzz not installed (fuzzy mode fails)
 
-# Verify model is available
-ollama list
-
-# Pull required models
-ollama pull gemma2       # For text analysis
-ollama pull gemma2:13b   # For larger model
-ollama pull gemma3       # For image analysis (vision-capable)
+```powershell
+pip install rapidfuzz
 ```
 
-#### Model Recommendations
-- **Text Analysis**: `gemma2` (9B) - balanced performance/quality
-- **Image Analysis**: `gemma3` (12B vision) - supports vision tasks
-- **GPU Available**: Use larger variants (13B+) for better quality
-- **CPU Only**: Stick with smaller variants (7B) for speed
+### Excel file locked
 
-#### Excel File Errors
-**Problem**: Cannot write Excel files  
-**Solution**: Ensure `openpyxl` is installed for Excel support.
+Close the output file in Excel before re-running. The script cannot write to a file that is open.
 
-#### PowerShell Execution Policy (Windows)
-**Problem**: Cannot activate virtual environment  
-**Solution**:
+### PowerShell execution policy (Windows)
+
 ```powershell
-# Use batch file activation
 .\venv\Scripts\activate.bat
-
-# Or bypass policy temporarily
+# or
 powershell -ExecutionPolicy Bypass -File .\venv\Scripts\Activate.ps1
 ```
 
-### Performance Optimization
+### Performance tips
 
-#### Memory Management
-- Process large datasets in chunks if memory issues occur.
-- Close Excel files before processing to avoid conflicts.
-- Monitor Ollama memory usage with `ollama serve` logs
+- Use smaller models for faster iteration (`gemma3:4b` instead of `gemma3:12b`).
+- Start with `--runs 1` or `--runs 2` to test settings before a full run.
+- Disable consensus types you don't need (`--no-between-model-consensus`, `--no-aggregate`).
+- Use `exact` mode rather than `fuzzy` when responses are short and categorical (less compute).
+- Process a small subset first: slice your input file to ~10 rows for testing.
 
-#### Speed Optimization
-- Use smaller models for faster processing (trade-off with quality)
-  - Text: `gemma2:7b` instead of `gemma2:13b`
-  - Images: Smaller vision models for faster processing
-- Reduce number of runs per item for quicker results (num_runs=2 for testing)
-- Disable between-model consensus if only using one model
-- Disable aggregated consensus if not needed
-- Process subsets of data for testing before full runs
-
-#### Configuration Tips
-- Use `exact` match mode for fastest consensus (less computation)
-- Use `fuzzy` mode only when needed (slower due to similarity calculations)
-- Set appropriate fuzzy threshold (0.7-0.9) to avoid excessive matching
-
-### Error Recovery
-- All errors are logged with row and run information.
-- Failed responses are marked as "Error occurred".
-- Analysis continues even if individual queries fail.
+---
 
 ## Version History
 
-### Recent Updates (Current Version)
-- **Unified Scripts**: Replaced individual scripts with `text_analysis.py` and `image_analysis.py`.
-- **Flexible Input/Output**: Support for single files, folders, and intelligent path resolution.
-- **Three Independent Consensus Types**: Within-model, between-model, and aggregated consensus now independently configurable.
-- **Enhanced Configuration**: Interactive prompts, config files (YAML/JSON), and CLI argument support.
-- **Type Safety**: Added None checks and assertions for robust error handling.
-- **Better Metadata**: Comprehensive analysis metadata (models, runs, duration, CPU/GPU info) appended to outputs.
+### v1.4 (2026-05-18)
 
-### Previous Updates
-- **Package Dependencies**: Fixed `ollama_python` -> `ollama` naming issue.
-- **Excel Support**: Added `openpyxl` for robust Excel handling.
-- **Integrated Workflow**: Combined analysis and consensus calculation.
-- **Enhanced Consensus**: Improved algorithm with better confidence scoring.
+- **Config key validation**: unknown keys in YAML/JSON config files now print a warning instead of being silently ignored. Helps catch typos like `ruuns: 5`.
+- **Output file collision prevention**: auto-generated output filenames get a `_YYYYMMDD_HHMMSS` timestamp suffix if the path already exists. Explicit `.xlsx` paths also get a timestamp suffix on collision.
+- **Model progress indicator**: the model loop now prints `(1/N)` / `(2/N)` so multi-model runs show progress in the terminal.
+- **Within-model confidence summary in metadata**: the metadata sheet now reports high/medium/low confidence row counts per model for all within-model consensus runs, not just aggregate runs.
+- **Em dashes removed from interactive prompts**: consensus mode selection prompts now use commas instead of em dashes.
 
-## Reporting Analysis in Excel/Spreadsheet software
-You can report number of words/numbers by using an H stack to create a count that you can then visualize with a bar chart.
-- =SORT(HSTACK(UNIQUE(A2:A100), COUNTIF(A2:A100, UNIQUE(A2:A100))), 2,-1)
+### v1.3 (2025-05-18)
+
+- **`ollama.generate` API**: switched from `chat` to `generate` (raw completion endpoint); lower overhead and more appropriate for single-turn structured extraction.
+- **Timeout and retry**: configurable via `--timeout` (default: 120s) and `--retries` (default: 2); retries use exponential backoff.
+- **Standardized column names**:
+  - `Consensus_Confidence (model)` → `Confidence (model)`
+  - `BetweenModel_Consensus` → `Between_Consensus`
+  - `BetweenModel_Consensus_Confidence` → `Between_Confidence`
+  - `Aggregated_Consensus` → `Aggregate_Consensus`
+  - `Aggregated_Consensus_Confidence` → `Aggregate_Confidence`
+- **Bug fix**: between-model consensus was only running when aggregate consensus was also enabled.
+- **Bug fix**: `append_metadata` flag was not guarding the metadata block.
+- **Bug fix**: within-model consensus was silently disabled for single-model runs regardless of run count (now correctly auto-enables when `runs > 1`).
+- **Bug fix**: between-model consensus prompt was shown even when only one model was selected (image script).
+- **New flags**: `--version`, `--prompt-desc` (text script), `--timeout`, `--retries`.
+- **Interactive prompts**: reordered and reworded for consistency between text and image workflows; input/output paths and analysis description are now asked before consensus settings.
+- **Removed**: `python_for_Zotero_abstracts/` scripts (superseded by `text_analysis.py` + `PROMPTS.md`), `archive/` legacy script.
+- **Added**: `PROMPTS.md` prompt library.
+- **CI**: GitHub Actions workflow now runs `run_local_consensus_test.py` on every push.
+- **Dependencies**: minimum versions pinned in `requirements.txt`.
+
+### v1.2-beta (2025-02-26)
+
+- Unified `text_analysis.py` and `image_analysis.py` scripts replacing per-task scripts.
+- Flexible input/output path resolution (file, folder, or auto-detect).
+- Three independent consensus types: within-model, between-model, aggregated.
+- YAML/JSON config file support with CLI override.
+- Progress bars via `tqdm`.
+- Metadata appended to Excel output.

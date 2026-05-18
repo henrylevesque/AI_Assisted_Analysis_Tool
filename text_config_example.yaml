@@ -1,17 +1,16 @@
 # Example YAML config for text_analysis.py
-# Save this as text_config.yaml and run: python text_analysis.py --config text_config.yaml --no-interactive
+# Run with: python text_analysis.py --config text_config.yaml --no-interactive
 
-# Models to use (array of model names from ollama)
-use_multiple_models: false
+# Models to use (one or more model names from ollama)
 models:
   - gemma3:12b
 
-# Prompt customization: what to look for in the text
+# What to look for in the text
 prompt_desc: "Main topic or theme"
 
-# Input/output paths:
-# - input: File path (e.g., ./data/abstracts.xlsx) or folder path (e.g., ./data/)
-# - output: File path (e.g., ./results.xlsx), folder path (e.g., ./results/), or leave empty/null to use input folder
+# Input/output paths
+# input:  file path (e.g., ./data/abstracts.xlsx) or folder path (auto-detects first .csv/.xlsx)
+# output: file path, folder path, or omit to save alongside the input file
 input: "./data/text_input/abstracts.xlsx"
 output: "./data/text_output/"
 
@@ -19,26 +18,30 @@ output: "./data/text_output/"
 id_col: "id"
 content_col: "abstract"
 
-# Number of times to run each row through the model (for consensus across runs)
+# Number of times to run each row through the model (used for within-model consensus)
 runs: 5
 
-# Within-model consensus: compute consensus across the multiple runs of same model on same item
-within_model_consensus: true
-within_model_consensus_mode: "fuzzy"  # exact, set, or fuzzy
-within_model_fuzzy_threshold: 85      # 0-100, higher = stricter matching
+# Ollama reliability settings
+timeout: 120    # seconds before a request is abandoned
+retries: 2      # number of retry attempts on failure (exponential backoff)
 
-# Between-model consensus: compute consensus across per-model results (only used with 2+ models)
+# Within-model consensus: compare N runs of the same model on the same item
+within_model_consensus: true
+within_model_consensus_mode: "fuzzy"   # exact | set | fuzzy
+within_model_fuzzy_threshold: 85       # 0–100, higher = stricter
+
+# Between-model consensus: compare per-model Consensus columns (requires 2+ models)
 between_model_consensus: false
 between_model_consensus_mode: "exact"
 between_model_fuzzy_threshold: 85
 
-# Aggregated consensus: compute consensus across ALL response columns (independent from between-model)
+# Aggregate consensus: compare ALL response columns together (independent from between-model)
 aggregate: false
 aggregated_consensus_mode: "exact"
 aggregated_fuzzy_threshold: 85
 
-# Delay in seconds between model runs (useful if switching models manually in Ollama)
+# Delay in seconds between switching models (useful if your GPU needs time to unload)
 delay: 0.0
 
-# Append metadata sheet to Excel output (prompt, models, duration, CPU/GPU info, etc.)
+# Append metadata to the Excel output (prompt, models, duration, CPU/GPU info, etc.)
 append_metadata: true

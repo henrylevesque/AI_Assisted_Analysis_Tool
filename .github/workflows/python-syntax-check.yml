@@ -1,4 +1,4 @@
-name: Python syntax check
+name: Python checks
 
 on:
   push:
@@ -7,18 +7,23 @@ on:
     branches: [ main ]
 
 jobs:
-  syntax-check:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Run syntax check
-        run: |
-          python -m compileall .
+          pip install -r requirements.txt
+
+      - name: Syntax check
+        run: python -m compileall -q .
+
+      - name: Consensus logic tests
+        run: python run_local_consensus_test.py

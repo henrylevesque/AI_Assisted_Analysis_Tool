@@ -2,46 +2,44 @@
 
 ## Introduction
 
-AI Assisted Analysis Tool is an open-source, locally-run toolkit for AI-assisted text and image analysis based on Ollama. It supports three main workflows (text, image, Zotero abstracts) and is designed for reproducible, researcher-friendly analyses. The code allows researchers to run large text based datasets, image datasets, or abstracts exported from Zotero, and run flexible AI enabled analysis on each item. The code logic supports using any LLM from Ollama, and uses a strategy of multiple runs of each item through the LLM that are then consolidated through three main consensus modes to give the modal response across runs to account for LLM errors or hallucinations, with a confidence score based on the percentage of modal responces to total responses. The code optionally supports running through multiple LLM models on the same dataset and allows comparison and consensus calculation within and between models.
+AI Assisted Analysis Tool is an open-source, locally-run toolkit for AI-assisted text and image analysis using [Ollama](https://ollama.com). The tool runs any LLM available in Ollama, executing each item multiple times and consolidating results through three consensus modes to produce a modal response with a confidence score. It optionally runs multiple models on the same dataset and computes consensus within and between models.
 
-See the License and Citation sections for more details: [License](LICENSE) · [Citation](CITATION.cff).
+See [License](LICENSE) · [Citation](CITATION.cff) · [Prompt Library](PROMPTS.md)
 
-## Table of contents
+## Table of Contents
 
 - [Text Analysis Workflow](#text-analysis-workflow)
 - [Image Analysis Workflow](#image-analysis-workflow)
-- [Zotero Abstracts Workflow](#zotero-abstracts-workflow)
-- [Usage patterns](#usage-patterns)
+- [Usage Patterns](#usage-patterns)
+- [Three Types of Consensus](#three-types-of-consensus)
 - [Requirements](#requirements)
-- [Getting started](#getting-started)
+- [Getting Started](#getting-started)
 - [Contributing](#contributing)
 - [License & Citation](#license--citation)
 
 ## Key Points
-- Supported inputs: Excel, CSV, image folders, and Zotero exports.
-- Command-line usage: scripts also accept standard CLI arguments (example flags: --config, --models, --runs, --within-model-consensus, --between-model-consensus, --output). Command-line arguments override config file values.
-- Defaults and precedence: built-in defaults → config file → explicit CLI arguments.
-- Configuration: analysis scripts accept YAML or JSON config files (e.g., configs/text_analysis.yaml or configs/image_analysis.json).
 
-### Quick examples:
-- Use a YAML config:
-    ```sh
-    python text_analysis.py --config configs/text_analysis.yaml
-    ```
-- Use a JSON config and override runs on the CLI:
-    ```sh
-    python image_analysis.py --config configs/image_analysis.json --runs 3
-    ```
+- **Inputs**: Excel (.xlsx), CSV, image files/folders (JPG, PNG, BMP, TIFF, GIF, WebP).
+- **LLM backend**: Ollama (local, no API key required, data stays on your machine).
+- **Consensus modes**: `exact`, `set`, `fuzzy` (within-model, between-model, or across all responses).
+- **CLI usage**: all settings can be supplied via `--flag` arguments or a YAML/JSON config file.
+- **Precedence**: built-in defaults → config file → CLI arguments (CLI wins).
+- **Reliability**: configurable timeout and automatic retry with exponential backoff.
 
-### Why use configs and CLI options:
-- Reproducibility: store full run settings in a config file for later reference.
-- Automation: enable batch runs or CI by supplying a single config file.
-- Flexibility: tweak individual settings on the fly via CLI without editing files.
+### Quick examples
 
-See the usage sections for each workflow for full lists of accepted config keys and CLI flags (Text Analysis, Image Analysis, Zotero Abstracts). For reporting, outputs include Excel files with optional embedded metadata and a metadata sheet documenting prompt, model, runs, duration, and environment.
+```sh
+# Interactive (prompts for all settings)
+python text_analysis.py
 
+# Config-driven, fully reproducible
+python text_analysis.py --config text_config_example.yaml --no-interactive
 
-## Process flowchart
+# Override config settings on the fly
+python image_analysis.py --config image_config_example.yaml --runs 3
+```
+
+## Process Flowchart
 
 ```mermaid
 graph LR
@@ -59,13 +57,11 @@ graph LR
     H --> I
     I --> J
 
-
     subgraph "LLM Models"
-        C1[Gemma2]
-        C2(Llama3.2)
+        C1[Gemma3]
+        C2(Llava)
         C3(Qwen3)
     end
-
 
     subgraph "Consensus Type"
         D1(Exact)
@@ -74,69 +70,64 @@ graph LR
         D4(Fuzzy Threshold)
     end
 
-
     subgraph "Data Source"
-        E1(Input Folder)
-        E2(Output Folder)
+        E1(Input File/Folder)
+        E2(Output File/Folder)
     end
-
 
     subgraph "Metadata"
         F1(Prompt)
         F2(LLM Used)
-        F3(System Specifications CPU and GPU)
+        F3(CPU and GPU)
         F4(Number of Runs)
-        F5(Rows with low, medium, and high confidence)
-        F6(Duration of Analysis)
+        F5(Confidence Distribution)
+        F6(Duration)
     end
 
-
     A(Start)
-    B(Display System LLM Models)
+    B(Display Available Models)
     C(Select LLM Models)
-    D(Select Consensus type)
-    E(Input Data Source)
-    F(Select Metadata)
-    G(Select Number of Runs)
-    H(Run through all data n times)
+    D(Select Consensus Type)
+    E(Specify Data Paths)
+    F(Select Metadata Options)
+    G(Set Number of Runs)
+    H(Run All Items N Times)
     I(Calculate Consensus)
-    J(Export to Excel File)
+    J(Export to Excel)
 ```
+
+---
 
 ## Text Analysis Workflow
 
-Purpose: analyze tabular data (Excel or CSV) using an LLM. Typical uses include extracting codes, identifying themes, or summarising text columns.
+Analyzes tabular data (Excel or CSV) using an LLM. Typical uses: extracting codes, identifying themes, classifying text, summarizing content.
 
-Key features:
+**Key features:**
+- Excel and CSV input (single file or auto-detect from folder).
+- Identifier and content columns selected by name (case-insensitive).
+- Custom prompt, configurable runs per row.
+- Within-model consensus and confidence scoring.
+- Optional between-model and aggregate consensus.
+- Metadata appended to output workbook.
 
-- Works with Excel and CSV files (single file or folder of files).
-- Lets you select identifier and content columns by name.
-- Custom prompts and configurable number of runs per row.
-- Optional within-model consensus and confidence scoring.
-- Flexible output: specify output file, folder, or use same location as input.
-- Optionally append reporting metadata to the output Excel file.
-
-### How to use (Interactive)
+### Interactive
 
 ```powershell
 python text_analysis.py
 ```
-Then follow prompts to:
-1. Select model(s)
-2. Provide input file or folder path
-3. Specify output location (optional; defaults to input folder)
-4. Choose identifier and content columns
-5. Set number of runs and consensus options
 
-### How to use (Config-based, recommended for reproducibility)
+Prompts for: model(s), input path, output path, columns, run count, consensus options.
 
-1. **Create a config file** (see [text_config_example.yaml](text_config_example.yaml) or [text_config_example.json](text_config_example.json) for templates):
+### Config-based (recommended for reproducibility)
+
+1. Copy and edit [text_config_example.yaml](text_config_example.yaml):
 
 ```yaml
-models: ['gemma3:12b']
-prompt_desc: "Main topic"
+models:
+  - gemma3:12b
+prompt_desc: "the main topic or theme"
 input: "./data/abstracts.xlsx"
-output: "./data/results.xlsx"
+output: "./data/results/"
 id_col: "id"
 content_col: "abstract"
 runs: 5
@@ -146,369 +137,267 @@ within_model_fuzzy_threshold: 85
 append_metadata: true
 ```
 
-2. **Run non-interactively** with the config:
+2. Run:
 
 ```powershell
 python text_analysis.py --config text_config_example.yaml --no-interactive
 ```
-
-3. **Or run interactively** and confirm using the config:
-
-```powershell
-python text_analysis.py --config text_config_example.yaml
-```
-The script will ask: "Load configuration from text_config_example.yaml? (y/n) [y]:"
-
-### Input and Output Paths
-
-- **input**: Can be:
-  - A direct file path: `./data/abstracts.xlsx` 
-  - A folder path: `./data/` (script finds first CSV/XLSX file)
-  - Default (interactive): `.` (current directory)
-
-- **output**: Can be:
-  - A direct file path: `./results.xlsx` (fixed output name)
-  - A folder path: `./output_folder/` (auto-generates filename)
-  - Not specified (defaults to input folder with auto-generated filename)
 
 ### CLI Examples
 
 ```powershell
-# Interactive with default settings
-python text_analysis.py
+# Basic single-model run
+python text_analysis.py \
+  --input ./data/abstracts.xlsx \
+  --id-col id --content-col abstract \
+  --runs 5 --models gemma3:12b \
+  --no-interactive
 
-# Config-based (non-interactive, most reproducible)
-python text_analysis.py --config text_config_example.yaml --no-interactive
+# Multi-model comparison
+python text_analysis.py \
+  --models "gemma3:12b,deepseek-r1:14b" \
+  --input ./data/abstracts.xlsx \
+  --between-model-consensus \
+  --runs 5 --no-interactive
 
-# Config-based (interactive, confirm before running)
-python text_analysis.py --config text_config_example.yaml
+# Config with CLI overrides
+python text_analysis.py --config text_config_example.yaml --runs 3 --within-model-consensus-mode exact
 
-# Override config settings from CLI
-python text_analysis.py --config text_config_example.yaml --runs 3 --within-model-consensus-mode fuzzy
-
-# CLI-only (no config file)
-python text_analysis.py --input "./data/abstracts.xlsx" --output "./results.xlsx" --id-col "id" --content-col "text" --runs 2 --no-interactive
+# With custom timeout and retries (useful for slow hardware)
+python text_analysis.py --config text_config_example.yaml --timeout 240 --retries 3 --no-interactive
 ```
+
+### Input & Output Paths
+
+| `input` | Behavior |
+|---------|-----------|
+| File path (`./data/file.xlsx`) | Analyzes that file |
+| Folder path (`./data/`) | Auto-detects first CSV/XLSX |
+| `.` (default interactive) | Uses current directory |
+
+| `output` | Behavior |
+|----------|-----------|
+| File path (`./results.xlsx`) | Saves to that file |
+| Folder path (`./results/`) | Auto-generates filename |
+| Not specified | Saves alongside input file |
+
+---
 
 ## Image Analysis Workflow
 
-Purpose: analyze images using local vision-capable models and compute consensus across runs and/or models.
+Analyzes images using local vision-capable models (llava, llama3.2-vision, qwen2.5vl, etc.).
 
-Key features:
+**Key features:**
+- Single image file or folder of images.
+- Multiple runs per image for within-model consensus.
+- Between-model and aggregate consensus supported.
+- Progress bars for images and runs.
 
-- Works with individual image files or folders of images (supports JPG, PNG, BMP, TIFF, GIF, WebP).
-- Multiple replicates per image produce Response_1..N columns.
-- Within-model Consensus and Consensus_Confidence modes: `exact`, `set`, `fuzzy`.
-- `fuzzy` uses `rapidfuzz` to cluster similar responses (optional dependency).
-- Flexible output: specify output file, folder, or use same location as input.
-- Progress bars and optional `switch_delay` between models.
-
-### How to use (Interactive)
+### Interactive
 
 ```powershell
 python image_analysis.py
 ```
-Then follow prompts to:
-1. Select vision model(s)
-2. Provide input image file or folder path
-3. Specify output location (optional; defaults to input folder)
-4. Specify what to identify in images
-5. Set number of runs and consensus options
 
-### How to use (Config-based, recommended for reproducibility)
+### Config-based
 
-1. **Create a config file** (see [image_config_example.yaml](image_config_example.yaml) or [image_config_example.json](image_config_example.json) for templates):
+1. Copy and edit [image_config_example.yaml](image_config_example.yaml):
 
 ```yaml
-models: ['gemma3:12b', 'llava:13b']
+models:
+  - llava:13b
+  - llama3.2-vision:11b
 type_of_analysis: "objects and materials"
 input: "./data/images/"
 output: "./data/image_results/"
 runs: 5
+timeout: 180
 within_model_consensus: true
 within_model_consensus_mode: fuzzy
-within_model_fuzzy_threshold: 85
 between_model_consensus: true
-between_model_consensus_mode: exact
-between_model_fuzzy_threshold: 85
-aggregate: false
 append_metadata: true
 ```
 
-2. **Run non-interactively** with the config:
+2. Run:
 
 ```powershell
 python image_analysis.py --config image_config_example.yaml --no-interactive
 ```
-
-3. **Or run interactively** and confirm using the config:
-
-```powershell
-python image_analysis.py --config image_config_example.yaml
-```
-
-### Input and Output Paths
-
-- **input**: Can be:
-  - A direct image file path: `./data/building.jpg`
-  - A folder path: `./data/images/` (analyzes all images in folder)
-  - Default (interactive): prompts for path
-
-- **output**: Can be:
-  - A direct file path: `./results.xlsx` (fixed output name)
-  - A folder path: `./output_folder/` (auto-generates filename)
-  - Not specified (defaults to input folder with auto-generated filename)
 
 ### CLI Examples
 
 ```powershell
-# Interactive with default settings
-python image_analysis.py
+# Single image
+python image_analysis.py \
+  --input ./photo.jpg --output ./results.xlsx \
+  --type-of-analysis "architectural features" \
+  --runs 3 --no-interactive
 
-# Config-based (non-interactive, most reproducible)
-python image_analysis.py --config image_config_example.yaml --no-interactive
-
-# Config-based (interactive, confirm before running)
-python image_analysis.py --config image_config_example.yaml
-
-# Override config settings from CLI
-python image_analysis.py --config image_config_example.yaml --runs 3 --aggregate
-
-# CLI-only (no config file, single image)
-python image_analysis.py --input "./images/photo.jpg" --output "./results.xlsx" --type-of-analysis "objects" --runs 2 --no-interactive
-
-# CLI-only (no config file, folder of images)
-python image_analysis.py --input "./images/" --models "gemma3:12b,llava:13b" --runs 3 --between-model-consensus --no-interactive
+# Folder of images, multi-model
+python image_analysis.py \
+  --input ./images/ \
+  --models "llava:13b,llama3.2-vision:11b" \
+  --runs 3 --between-model-consensus --no-interactive
 ```
 
-For fuzzy consensus modes, install `rapidfuzz`:
+For fuzzy consensus, install `rapidfuzz`:
 
 ```powershell
 pip install rapidfuzz
 ```
 
-## Zotero Abstracts Workflow
+---
 
-Purpose: targeted analyses of bibliographic abstracts exported from Zotero. The `python_for_Zotero_abstracts` folder contains scripts for common tasks.
+## Usage Patterns
 
-Common scripts:
+| Mode | When to use |
+|------|-------------|
+| **Interactive** | Exploring, one-off analyses, testing settings |
+| **Config-driven + `--no-interactive`** | Documented, reproducible analyses |
+| **CLI flags only** | Scripting, batch jobs |
 
-- `theory.py` — identify theories mentioned in abstracts.
-- `n_themes.py` — identify themes.
-- `methods.py` — identify methods.
-- `results.py` — extract reported results.
-- `location.py` — identify geographic or contextual location.
+### Tri-State Boolean Flags
 
-Workflow:
+These flags have three states so that omitting a flag does not accidentally override a config file value:
 
-1. Export your Zotero collection as CSV or Excel.
-2. Run the appropriate script in `python_for_Zotero_abstracts` and follow prompts or provide a config.
+| Flag | Effect |
+|------|--------|
+| `--within-model-consensus` | Force ON |
+| `--no-within-model-consensus` | Force OFF |
+| *(omitted)* | Use config/default |
 
-## Usage patterns
+Same pattern for `--between-model-consensus`, `--aggregate`, and `--append-metadata`.
 
-Run modes:
+**Defaults when not specified:** within-model ON, between-model ON (only with 2+ models), aggregate OFF, append-metadata ON.
 
-- Interactive: omit `--config`/`--no-interactive` and respond to prompts.
-- CLI-only (non-interactive): provide all settings and use `--no-interactive`.
-- Config-driven: provide `--config <file>` (YAML/JSON) and optionally override via CLI.
+### All CLI Flags
 
-Tri-state boolean flags
-
-The scripts use explicit on/off flags so a missing flag doesn't accidentally change config values. These flags are:
-
-- Within-model consensus: `--within-model-consensus` / `--no-within-model-consensus` (defaults to ON when not specified).
-- Between-model consensus: `--between-model-consensus` / `--no-between-model-consensus` (defaults to ON when not specified).
-- Aggregated consensus: `--aggregate` / `--no-aggregate` (defaults to OFF when not specified).
-- Append metadata: `--append-metadata` / `--no-append-metadata` (defaults to ON when not specified).
-
-Specifying `--within-model-consensus` forces it on; `--no-within-model-consensus` forces it off. Omitting both uses the config file or script default.
-
-### Three Types of Consensus
-
-The tool supports three independent consensus calculations to account for LLM variability:
-
-1. **Within-Model Consensus**: Computed across multiple runs of the same model on the same item
-   - Applied to `Response_1`, `Response_2`, etc. columns for each model
-   - Produces `Consensus (ModelName)` and `Consensus_Confidence (ModelName)` columns
-   - Defaults to ON; automatically OFF if only one run per item
-   - Modes: `exact` (text must match), `set` (treat responses as unordered lists), `fuzzy` (similarity-based grouping)
-
-2. **Between-Model Consensus**: Computed across per-model consensus results when multiple models are used
-   - Applied to `Consensus (Model1)`, `Consensus (Model2)`, etc. columns
-   - Produces `BetweenModel_Consensus` and `BetweenModel_Consensus_Confidence` columns
-   - Only applies if 2+ models are used; defaults to ON
-   - Modes: `exact`, `set`, `fuzzy` (configurable independently from within-model)
-
-3. **Aggregated Consensus**: Computed across ALL response columns regardless of model
-   - Applied directly to all `Response_X (Model)` columns
-   - Produces `Aggregated_Consensus` and `Aggregated_Consensus_Confidence` columns
-   - Independent from between-model consensus; defaults to OFF
-   - Useful for single-model + multiple-run analysis or treating all responses equally
-   - Modes: `exact`, `set`, `fuzzy` (configurable independently)
-
-Examples:
-
-```powershell
-# Interactive mode (prompts for all settings)
-python text_analysis.py
-
-# Config-driven non-interactive mode (all settings from file)
-python text_analysis.py --config configs/text_config_example.yaml --no-interactive
-
-# Config with CLI overrides (config provides defaults, CLI overrides specific settings)
-python image_analysis.py --config configs/image_config_example.yaml --runs 5 --aggregate
-
-# CLI-only (no config, specify all settings on command line)
-python image_analysis.py --models "gemma3:12b" --input "./images" --output "results.xlsx" --runs 2 --within-model-consensus --within-model-consensus-mode fuzzy --within-model-fuzzy-threshold 85 --no-interactive
+```
+--config, -c              Path to YAML or JSON config file
+--models                  Comma-separated model names
+--input                   Input file or folder path
+--output                  Output file or folder path
+--runs                    Number of runs per item
+--timeout                 Ollama request timeout in seconds [120]
+--retries                 Retry attempts on Ollama failure [2]
+--delay                   Delay between model switches in seconds
+--within-model-consensus / --no-within-model-consensus
+--within-model-consensus-mode   exact | set | fuzzy
+--within-model-fuzzy-threshold  0–100
+--between-model-consensus / --no-between-model-consensus
+--between-model-consensus-mode  exact | set | fuzzy
+--between-model-fuzzy-threshold 0–100
+--aggregate / --no-aggregate
+--append-metadata / --no-append-metadata
+--no-interactive          Suppress all prompts (requires all settings via config/CLI)
 ```
 
-### Config File Workflow
+Text-only flags: `--id-col`, `--content-col`
+Image-only flags: `--type-of-analysis`
 
-When using `--config <file>`:
-1. In interactive mode, you're prompted to confirm using the config file before proceeding with analysis
-2. In non-interactive mode (`--no-interactive`), the config settings are applied directly
-3. Config values serve as defaults; CLI arguments override them
-4. Missing settings in config fall back to built-in defaults
+---
 
-Config files support both YAML and JSON formats. Example config keys:
-- `models`: Array of model names to run sequentially
-- `runs`: Number of times to run each item through each model
-- `within_model_consensus`: Boolean (true/false) 
-- `within_model_consensus_mode`: One of 'exact', 'set', or 'fuzzy'
-- `within_model_fuzzy_threshold`: Threshold 0-100 for fuzzy matching
-- `between_model_consensus`: Boolean (only applies with 2+ models)
-- `between_model_consensus_mode`: One of 'exact', 'set', or 'fuzzy'
-- `between_model_fuzzy_threshold`: Threshold 0-100 for fuzzy matching
-- `aggregate`: Boolean (independent aggregation across all responses)
-- `aggregated_consensus_mode`: One of 'exact', 'set', or 'fuzzy' for aggregated results
-- `aggregated_fuzzy_threshold`: Threshold 0-100 for aggregated fuzzy matching
+## Three Types of Consensus
+
+The tool computes three independent consensus types to account for LLM variability:
+
+### 1. Within-Model Consensus
+Computed across N runs of the same model on the same item.
+- Input columns: `Response_1 (model)`, `Response_2 (model)`, ...
+- Output columns: `Consensus (model)`, `Confidence (model)`
+- Default: ON when runs > 1
+
+### 2. Between-Model Consensus
+Computed across per-model consensus results (requires 2+ models).
+- Input columns: `Consensus (model1)`, `Consensus (model2)`, ...
+- Output columns: `Between_Consensus`, `Between_Confidence`
+- Default: ON when 2+ models are used
+
+### 3. Aggregate Consensus
+Computed across all response columns, regardless of model.
+- Input columns: all `Response_X (model)` columns
+- Output columns: `Aggregate_Consensus`, `Aggregate_Confidence`
+- Default: OFF (useful for treating all runs uniformly)
+
+### Consensus Modes
+
+| Mode | Best for | Notes |
+|------|----------|-------|
+| `exact` | Short discrete labels (categories, sentiment) | Normalizes case and punctuation before comparing |
+| `set` | Comma/semicolon-separated lists (themes, keywords) | Items appearing in >50% of runs are kept |
+| `fuzzy` | Free-text that may be paraphrased | Requires `rapidfuzz`; threshold 80–90 recommended |
+
+See [PROMPTS.md](PROMPTS.md) for a full prompt library and guidance on choosing a consensus mode.
+
+---
 
 ## Common Workflows
 
-### Workflow 1: Single File Analysis (Text)
-Best for: Quick analysis of one Excel/CSV file
+### Single-model text analysis
 ```powershell
-# Create a minimal config
-python text_analysis.py --config text_config_example.yaml --input "./my_data.xlsx" --output "./my_results.xlsx" --no-interactive
+python text_analysis.py \
+  --input ./data/abstracts.xlsx \
+  --id-col id --content-col abstract \
+  --runs 5 --models gemma3:12b \
+  --within-model-consensus --within-model-consensus-mode fuzzy \
+  --no-interactive
 ```
 
-### Workflow 2: Batch Processing with Folder
-Best for: Running the same analysis on multiple files in a folder
-```powershell
-# First file in folder will be auto-detected and analyzed
-python text_analysis.py --config text_config_example.yaml --no-interactive
-```
-
-### Workflow 3: Reproducible Analysis with Config
-Best for: Documenting exactly how an analysis was performed
-```powershell
-# 1. Create and version-control your config file in your project
-# 2. Run the analysis
-python text_analysis.py --config ./configs/my_analysis.yaml --no-interactive
-
-# Later, you can reproduce the exact same analysis by running the same command
-```
-
-### Workflow 4: Model Comparison
-Best for: Comparing responses across multiple models
+### Multi-model comparison
 ```yaml
-# Create config with multiple models
+# comparison_config.yaml
 models:
   - gemma3:12b
-  - llama3.2:7b
+  - deepseek-r1:14b
 between_model_consensus: true
-between_model_consensus_mode: "fuzzy"
+between_model_consensus_mode: fuzzy
+runs: 5
 ```
 ```powershell
 python text_analysis.py --config comparison_config.yaml --no-interactive
 ```
 
-### Workflow 5: Consensus Evaluation
-Best for: Setting multiple consensus modes to compare results
-```yaml
-# Config with within-model fuzzy consensus
-within_model_consensus: true
-within_model_consensus_mode: "fuzzy"
-within_model_fuzzy_threshold: 85
-
-# Plus aggregated consensus across all runs
-aggregate: true
-aggregated_consensus_mode: "exact"
-```
+### Reproducible analysis (config-driven)
 ```powershell
-python text_analysis.py --config consensus_config.yaml --no-interactive
+# Store the config alongside your data; re-run anytime to reproduce results
+python text_analysis.py --config ./study/analysis_config.yaml --no-interactive
 ```
 
-### Workflow 6: Single Image Analysis
-Best for: Quick analysis of one image
-```powershell
-python image_analysis.py --input "./photo.jpg" --output "./results.xlsx" --type-of-analysis "architectural features" --runs 3 --no-interactive
-```
+---
 
 ## Best Practices
 
-1. **Use config files for reproducible analyses**: Config files document exactly what settings were used, making your work reproducible.
+1. **Use config files** for any analysis you need to reproduce or document; store the config with your data.
+2. **Always use `--no-interactive`** in scripts and batch jobs.
+3. **Test with `--runs 1`** before committing to a full run.
+4. **Check confidence scores**: rows below 40% confidence may need manual review.
+5. **Use fuzzy mode thoughtfully**: it smooths variation but can mask real disagreement; review the threshold.
+6. **Increase `--timeout`** for large models or slow hardware (default: 120s for text, recommend 180s+ for vision).
 
-2. **Always use `--no-interactive` in scripts**: Use `--no-interactive` when running analyses from scripts or batch jobs to avoid hangs waiting for input.
-
-3. **Test with small runs first**: Before running with `runs: 10+`, test with `runs: 1-2` to verify settings are correct.
-
-4. **Monitor GPU memory**: If analyzing large images or many items, start with fewer runs to avoid GPU memory issues.
-
-5. **Use fuzzy consensus carefully**: Fuzzy matching is flexible but can mask real differences. Always review the confidence scores.
-
-6. **Specify output location explicitly**: Don't rely on defaults; specify `output` in your config to avoid surprises about where results are saved.
-
-7. **Append metadata**: Always use `append_metadata: true` to document analysis conditions for later reference.
+---
 
 ## Requirements
 
-- Python 3.10+ recommended.
-- Dependencies: install from `requirements.txt`:
+- Python 3.10+
+- [Ollama](https://ollama.com/download) installed and running locally
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-- `ollama` (local runtime) — see https://ollama.com/download for platform installers.
-- Optional: `rapidfuzz` for fuzzy consensus (install via `pip install rapidfuzz` or included in `requirements.txt`).
-
-## Getting started
-
-See [documentation.md](documentation.md) for a step-by-step guide and example configs in the repo ([image_config_example.yaml](image_config_example.yaml), [text_config_example.yaml](text_config_example.yaml)).
-
-## Contributing
-
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for guidelines.
-
-## License & Citation
-
-See [LICENSE](LICENSE) for license terms. If you use this software (or parts of it) in a publication, please cite this project using the metadata in [CITATION.cff](CITATION.cff).
-
-Example (APA):
-
-Levesque, H. (2025). AI_Assisted_Analysis_Tool (version 1.2-beta) [Software]. Zenodo. https://doi.org/10.5281/zenodo.14932653
-
-BibTeX example:
-
-```bibtex
-@software{levesque_ai_2025,
-    author = {Levesque, Henry},
-    title = {AI_Assisted_Analysis_Tool},
-    year = {2025},
-    version = {1.2-beta},
-    doi = {10.5281/zenodo.14932653},
-    url = {https://github.com/henrylevesque/AI_Analysis_Tool}
-}
+Optional (required only for fuzzy consensus mode):
+```powershell
+pip install rapidfuzz
 ```
 
-# AI Assisted Analysis Tool - Quick Start
+---
 
 ## Getting Started
 
 1. **Clone the repository**
    ```powershell
-   git clone https://github.com/hleve/AI_Assisted_Analysis_Tool.git
+   git clone https://github.com/henrylevesque/AI_Assisted_Analysis_Tool.git
+   cd AI_Assisted_Analysis_Tool
    ```
 
 2. **Install dependencies**
@@ -516,18 +405,51 @@ BibTeX example:
    pip install -r requirements.txt
    ```
 
-3. **Run the main script**
+3. **Pull a model in Ollama**
+   ```powershell
+   ollama pull gemma3:12b
+   ```
+
+4. **Run interactively**
    ```powershell
    python text_analysis.py
    ```
 
-4. **Explore analysis modules**
-   - `other_analysis/ai_response_aggregation.py`: Aggregates AI responses
-   - `python_for_Zotero_abstracts/`: Contains thematic and methodological analysis scripts
+5. **Or copy an example config and run non-interactively**
+   ```powershell
+   copy text_config_example.yaml my_config.yaml
+   # edit my_config.yaml for your data
+   python text_analysis.py --config my_config.yaml --no-interactive
+   ```
 
-Optional: if you use Ollama models locally, pull the default model:
-```bash
-ollama pull gemma2
+For a full prompt library and workflow examples, see [PROMPTS.md](PROMPTS.md).
+For technical documentation, see [documentation.md](documentation.md).
+
+---
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for guidelines.
+
+---
+
+## License & Citation
+
+See [LICENSE](LICENSE) for license terms. If you use this tool in a publication, please cite it using [CITATION.cff](CITATION.cff).
+
+APA:
+
+> Levesque, H. (2025). AI_Assisted_Analysis_Tool (version 1.3) [Software]. Zenodo. https://doi.org/10.5281/zenodo.14932653
+
+BibTeX:
+
+```bibtex
+@software{levesque_ai_2025,
+    author  = {Levesque, Henry},
+    title   = {AI\_Assisted\_Analysis\_Tool},
+    year    = {2025},
+    version = {1.3},
+    doi     = {10.5281/zenodo.14932653},
+    url     = {https://github.com/henrylevesque/AI_Assisted_Analysis_Tool}
+}
 ```
-
-For detailed technical documentation, configuration, and developer notes, see [documentation.md](documentation.md).
