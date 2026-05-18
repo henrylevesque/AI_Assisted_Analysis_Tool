@@ -293,7 +293,7 @@ def main():
     if data_out:
         data_out = _clean_path(data_out)
     
-    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helptful. The text is:'
+    prompt_template = f'I am going to give you a chunk of text. Please identify {prompt_desc} used in the text. Do not tell me anything besides {prompt_desc} If you tell me anything besides {prompt_desc} you will not be helpful. The text is:'
     
     # Resolve input file path
     try:
