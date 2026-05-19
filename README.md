@@ -289,20 +289,7 @@ pip install rapidfuzz
 
 ## Zotero Abstracts Workflow
 
-Purpose: targeted analyses of bibliographic abstracts exported from Zotero. The `python_for_Zotero_abstracts` folder contains scripts for common tasks.
-
-Common scripts:
-
-- `theory.py` — identify theories mentioned in abstracts.
-- `n_themes.py` — identify themes.
-- `methods.py` — identify methods.
-- `results.py` — extract reported results.
-- `location.py` — identify geographic or contextual location.
-
-Workflow:
-
-1. Export your Zotero collection as CSV or Excel.
-2. Run the appropriate script in `python_for_Zotero_abstracts` and follow prompts or provide a config.
+Zotero-specific scripts have been removed from this repository.
 
 ## Usage patterns
 

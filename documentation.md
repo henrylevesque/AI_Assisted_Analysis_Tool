@@ -71,7 +71,6 @@ AI_Assisted_Analysis_Tool/
 ├── Data_Input/          # User places CSV/Excel files here
 ├── Data_Output/         # Generated analysis results
 ├── other_analysis/      # Analysis scripts
-├── python_for_Zotero_abstracts/  # Zotero-specific tools
 └── requirements.txt     # Python dependencies
 ```
 
@@ -110,14 +109,6 @@ Both main analysis scripts support:
 - **Input**: Single file, folder of files, or interactive path selection
 - **Output**: Direct file path, output folder, or automatic placement (defaults to input location)
 - **Path Resolution**: Intelligent handling of quoted paths and whitespace cleanup
-
-#### 4. Zotero-Specific Tools (Optional)
-Individual scripts for common bibliographic analysis tasks:
-- `theory.py` - Urban planning theory identification
-- `methods.py` - Research methodology extraction
-- `results.py` - Results summarization
-- `location.py` - Geographic location identification
-- `n_themes.py` - Theme extraction
 
 ## Package Dependencies
 
