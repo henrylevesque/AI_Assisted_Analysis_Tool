@@ -42,6 +42,20 @@ def _clean_path_helper(p: str):
     return p
 
 
+def _call_generate_with_retries(model, prompt, images=None, timeout=120, retries=2):
+    for attempt in range(retries + 1):
+        try:
+            if images is not None:
+                resp = generate(model=model, prompt=prompt, images=images)
+            else:
+                resp = generate(model=model, prompt=prompt)
+            return resp
+        except Exception as e:
+            if attempt >= retries:
+                raise
+            time.sleep(2 ** attempt)
+
+
 def is_image_file(path):
     """Check if path is an image file."""
     if not path:
@@ -131,7 +145,7 @@ def load_config(path):
     raise ValueError("Config file must be valid JSON or YAML")
 
 
-def run_model_on_images(model_name, images, data_input_folder, prompt_template, num_runs, output_file_path, save_every=10):
+def run_model_on_images(model_name, images, data_input_folder, prompt_template, num_runs, output_file_path, save_every=10, timeout=120, retries=2):
     """
     Run a single model across images using stateless generate calls (no accumulated context).
     Saves interim results every save_every images to protect against crashes.
@@ -146,7 +160,7 @@ def run_model_on_images(model_name, images, data_input_folder, prompt_template, 
         for run in tqdm(range(num_runs), desc="runs", unit="run", leave=False, file=sys.stdout, dynamic_ncols=True, total=num_runs):
             try:
                 # Use generate (stateless) with images at top level — prevents context accumulation
-                resp = generate(model=model_name, prompt=prompt_template, images=[img_path])
+                resp = _call_generate_with_retries(model=model_name, prompt=prompt_template, images=[img_path], timeout=timeout, retries=retries)
                 cleaned = resp['response'].strip().replace('\r', ' ').replace('\n', ' ')
                 row_responses.append(cleaned)
             except Exception as e:
@@ -287,6 +301,8 @@ def main():
     parser.add_argument('--input', help='Input image file or folder path')
     parser.add_argument('--output', help='Output folder path')
     parser.add_argument('--runs', type=int, help='Number of runs per image')
+    parser.add_argument('--timeout', type=int, default=120, help='Timeout seconds for model calls (default:120)')
+    parser.add_argument('--retries', type=int, default=2, help='Number of retries for model calls (default:2)')
     parser.add_argument('--save-every', type=int, default=10, help='Save interim results every N images (default: 10)')
     grp_wm = parser.add_mutually_exclusive_group()
     grp_wm.add_argument('--within-model-consensus', dest='within_model_consensus', action='store_true')
@@ -506,7 +522,9 @@ def main():
     for idx, model in enumerate(models_to_run):
         print(f"\nRunning model: {model}")
         metadata_models.append(model)
-        rows = run_model_on_images(model, images, input_folder, prompt_template, num_runs, output_file_path, save_every=save_every)
+        timeout_val = _get('timeout') or 120
+        retries_val = _get('retries') or 2
+        rows = run_model_on_images(model, images, input_folder, prompt_template, num_runs, output_file_path, save_every=save_every, timeout=timeout_val, retries=retries_val)
         model_df = pd.DataFrame(rows)
 
         response_cols = [c for c in model_df.columns if c.lower().startswith('response')]

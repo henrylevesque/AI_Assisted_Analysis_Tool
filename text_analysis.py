@@ -15,6 +15,23 @@ except Exception:
 from tqdm import tqdm
 from ollama import generate
 
+# Version for CLI --version
+VERSION = "1.4"
+
+
+def _call_generate_with_retries(model, prompt, images=None, timeout=120, retries=2):
+    for attempt in range(retries + 1):
+        try:
+            if images is not None:
+                resp = generate(model=model, prompt=prompt, images=images)
+            else:
+                resp = generate(model=model, prompt=prompt)
+            return resp
+        except Exception as e:
+            if attempt >= retries:
+                raise
+            time.sleep(2 ** attempt)
+
 
 def list_input_file(folder):
     """List first CSV or XLSX file found in folder."""
@@ -163,10 +180,14 @@ def main():
     parser.add_argument('--config', '-c', help='Path to JSON or YAML config file')
     parser.add_argument('--models', help='Comma-separated model names to run (overrides config)')
     parser.add_argument('--input', help='Input folder path')
+    parser.add_argument('--prompt-desc', help='Short description of the prompt for metadata')
     parser.add_argument('--output', help='Output folder path')
     parser.add_argument('--id-col', help='Identifier column name')
     parser.add_argument('--content-col', help='Content column name')
     parser.add_argument('--runs', type=int, help='Number of runs per row')
+    parser.add_argument('--timeout', type=int, default=120, help='Timeout seconds for model calls (default:120)')
+    parser.add_argument('--retries', type=int, default=2, help='Number of retries for model calls (default:2)')
+    parser.add_argument('--version', action='store_true', help='Print version and exit')
     parser.add_argument('--save-every', type=int, default=50, help='Save interim results every N rows (default: 50)')
     # Consensus flags (within-model and between-model terminology)
     grp_wm = parser.add_mutually_exclusive_group()
@@ -195,6 +216,10 @@ def main():
     parser.set_defaults(append_metadata=None)
     parser.add_argument('--no-interactive', action='store_true', help='Run non-interactively (require args/config for prompts)')
     args = parser.parse_args()
+
+    if getattr(args, 'version', False):
+        print(VERSION)
+        return
 
     cfg = {}
     if args.config:
@@ -539,7 +564,7 @@ def main():
         final_order = existing + remaining
         return df_in[final_order]
 
-    def run_model_on_texts(model_name, texts, prompt_template, num_runs, ids, outpath, save_every=50):
+    def run_model_on_texts(model_name, texts, prompt_template, num_runs, ids, outpath, save_every=50, timeout=120, retries=2):
         """
         Run model on texts using stateless generate calls (no accumulated context).
         Saves interim results every save_every rows to protect against crashes.
@@ -555,7 +580,7 @@ def main():
                 for run in tqdm(range(num_runs), desc="runs", unit="run", leave=False, file=sys.stdout, total=num_runs, dynamic_ncols=True):
                     try:
                         # Use generate (stateless) instead of chat to prevent context accumulation
-                        resp = generate(model=model_name, prompt=f"{prompt_template} {txt}")
+                        resp = _call_generate_with_retries(model=model_name, prompt=f"{prompt_template} {txt}", timeout=timeout, retries=retries)
                         cleaned = resp['response'].strip().replace('\r', ' ').replace('\n', ' ')
                         row_responses.append(cleaned)
                     except Exception as e:
@@ -582,7 +607,10 @@ def main():
         model = m
         print(f"\nRunning model: {model}")
         metadata_models.append(model)
-        rows = run_model_on_texts(model, contents, prompt_template, num_runs, ids, outpath, save_every=save_every)
+        timeout_val = _get('timeout') or 120
+        retries_val = _get('retries') or 2
+        prompt_desc = _get('prompt-desc') or None
+        rows = run_model_on_texts(model, contents, prompt_template, num_runs, ids, outpath, save_every=save_every, timeout=timeout_val, retries=retries_val)
         model_df = pd.DataFrame(rows)
 
         # Drop duplicate Identifier rows before merging

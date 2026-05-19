@@ -5,7 +5,7 @@ authors:
   given-names: "Henry"
   orcid: "https://orcid.org/0009-0008-5636-1143"
 title: "AI_Assisted_Analysis_Tool"
-version: 1.2-beta
+version: 1.4
 doi: 10.5281/zenodo.14932653
-date-released: 2025-02-26
-url: "https://github.com/henrylevesque/AI_Analysis_Tool"
+date-released: 2026-05-18
+url: "https://github.com/henrylevesque/AI_Assisted_Analysis_Tool"
