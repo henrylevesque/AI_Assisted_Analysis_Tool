@@ -42,13 +42,17 @@ def _clean_path_helper(p: str):
     return p
 
 
-def _call_generate_with_retries(model, prompt, images=None, timeout=120, retries=2):
+def _call_generate_with_retries(model, prompt, images=None, timeout=120, retries=2, think=None, num_ctx=None):
+    kwargs = {'model': model, 'prompt': prompt}
+    if images is not None:
+        kwargs['images'] = images
+    if think is not None:
+        kwargs['think'] = think
+    if num_ctx is not None:
+        kwargs['options'] = {'num_ctx': num_ctx}
     for attempt in range(retries + 1):
         try:
-            if images is not None:
-                resp = generate(model=model, prompt=prompt, images=images)
-            else:
-                resp = generate(model=model, prompt=prompt)
+            resp = generate(**kwargs)
             return resp
         except Exception as e:
             if attempt >= retries:
@@ -145,7 +149,7 @@ def load_config(path):
     raise ValueError("Config file must be valid JSON or YAML")
 
 
-def run_model_on_images(model_name, images, data_input_folder, prompt_template, num_runs, output_file_path, save_every=10, timeout=120, retries=2):
+def run_model_on_images(model_name, images, data_input_folder, prompt_template, num_runs, output_file_path, save_every=10, timeout=120, retries=2, think=None, num_ctx=None):
     """
     Run a single model across images using stateless generate calls (no accumulated context).
     Saves interim results every save_every images to protect against crashes.
@@ -160,7 +164,7 @@ def run_model_on_images(model_name, images, data_input_folder, prompt_template, 
         for run in tqdm(range(num_runs), desc="runs", unit="run", leave=False, file=sys.stdout, dynamic_ncols=True, total=num_runs):
             try:
                 # Use generate (stateless) with images at top level — prevents context accumulation
-                resp = _call_generate_with_retries(model=model_name, prompt=prompt_template, images=[img_path], timeout=timeout, retries=retries)
+                resp = _call_generate_with_retries(model=model_name, prompt=prompt_template, images=[img_path], timeout=timeout, retries=retries, think=think, num_ctx=num_ctx)
                 cleaned = resp['response'].strip().replace('\r', ' ').replace('\n', ' ')
                 row_responses.append(cleaned)
             except Exception as e:
@@ -319,6 +323,10 @@ def main():
     parser.add_argument('--between-model-fuzzy-threshold', type=int)
     parser.add_argument('--delay', type=float)
     parser.add_argument('--type-of-analysis', help='What to identify in images (e.g., objects, scene, text)')
+    parser.add_argument('--prompt', help='Exact raw prompt to send to the model, bypassing the --type-of-analysis template')
+    parser.add_argument('--think', type=str, default=None, choices=['true', 'false'],
+                         help='Enable/disable model thinking mode (true/false). Default: leave to model default.')
+    parser.add_argument('--num-ctx', type=int, default=None, help='Context window size passed to Ollama (default: model default)')
     parser.add_argument('--aggregate', dest='aggregate', action='store_true')
     parser.add_argument('--no-aggregate', dest='aggregate', action='store_false')
     parser.set_defaults(aggregate=None)
@@ -472,14 +480,22 @@ def main():
         append_metadata = True if append_metadata in (True, 'y', 'yes', '1') else False
 
     # Prompt
-    type_of_analysis = _get('type-of-analysis') or None
-    if not type_of_analysis and not args.no_interactive:
-        type_of_analysis = input("Enter what you want the program to identify within the image(s) (e.g., objects, scene, text): ").strip()
-    type_of_analysis = type_of_analysis or 'objects'
-    prompt_template = (
-        "You are a design expert in a design review. You will be shown an image. Please tell me {what} concisely and only return {what}. "
-        "If multiple items are present, separate them with commas. If you tell me anything other than {what}, you will not be helpful."
-    ).format(what=type_of_analysis)
+    raw_prompt = _get('prompt') or None
+    if raw_prompt:
+        prompt_template = raw_prompt
+    else:
+        type_of_analysis = _get('type-of-analysis') or None
+        if not type_of_analysis and not args.no_interactive:
+            type_of_analysis = input("Enter what you want the program to identify within the image(s) (e.g., objects, scene, text): ").strip()
+        type_of_analysis = type_of_analysis or 'objects'
+        prompt_template = (
+            "You are a design expert in a design review. You will be shown an image. Please tell me {what} concisely and only return {what}. "
+            "If multiple items are present, separate them with commas. If you tell me anything other than {what}, you will not be helpful."
+        ).format(what=type_of_analysis)
+
+    think_arg = _get('think')
+    think = {'true': True, 'false': False}.get(think_arg) if think_arg else None
+    num_ctx = _get('num-ctx')
 
     # Input/output
     data_input_folder = _get('input') or (input("Enter the path to an image file or folder: ").strip() if not args.no_interactive else None)
@@ -524,7 +540,7 @@ def main():
         metadata_models.append(model)
         timeout_val = _get('timeout') or 120
         retries_val = _get('retries') or 2
-        rows = run_model_on_images(model, images, input_folder, prompt_template, num_runs, output_file_path, save_every=save_every, timeout=timeout_val, retries=retries_val)
+        rows = run_model_on_images(model, images, input_folder, prompt_template, num_runs, output_file_path, save_every=save_every, timeout=timeout_val, retries=retries_val, think=think, num_ctx=num_ctx)
         model_df = pd.DataFrame(rows)
 
         response_cols = [c for c in model_df.columns if c.lower().startswith('response')]
@@ -627,6 +643,7 @@ def main():
                 ws.append([f"Save-every interval: {save_every} images"])
                 ws.append([f"Delay between model runs: {switch_delay} seconds"])
                 ws.append([f"Context mode: stateless (generate)"])
+                ws.append([f"Think mode: {think if think is not None else 'model default'}"])
                 ws.append([f"Within-model consensus enabled: {within_model}"])
                 ws.append([f"Within-model consensus mode: {within_model_mode}"])
                 if within_model_mode == 'fuzzy':
