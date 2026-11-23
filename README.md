@@ -15,31 +15,33 @@ See the License and Citation sections for more details: [License](LICENSE) · [C
 - [Requirements](#requirements)
 - [Getting started](#getting-started)
 - [Contributing](#contributing)
-- [License & Citation](#license--citation)
+- [License &amp; Citation](#license--citation)
 
 ## Key Points
+
 - Supported inputs: Excel, CSV, image folders, and Zotero exports.
 - Command-line usage: scripts also accept standard CLI arguments (example flags: --config, --models, --runs, --within-model-consensus, --between-model-consensus, --output). Command-line arguments override config file values.
 - Defaults and precedence: built-in defaults → config file → explicit CLI arguments.
 - Configuration: analysis scripts accept YAML or JSON config files (e.g., configs/text_analysis.yaml or configs/image_analysis.json).
 
 ### Quick examples:
+
 - Use a YAML config:
-    ```sh
-    python text_analysis.py --config configs/text_analysis.yaml
-    ```
+  ```sh
+  python text_analysis.py --config configs/text_analysis.yaml
+  ```
 - Use a JSON config and override runs on the CLI:
-    ```sh
-    python image_analysis.py --config configs/image_analysis.json --runs 3
-    ```
+  ```sh
+  python image_analysis.py --config configs/image_analysis.json --runs 3
+  ```
 
 ### Why use configs and CLI options:
+
 - Reproducibility: store full run settings in a config file for later reference.
 - Automation: enable batch runs or CI by supplying a single config file.
 - Flexibility: tweak individual settings on the fly via CLI without editing files.
 
 See the usage sections for each workflow for full lists of accepted config keys and CLI flags (Text Analysis, Image Analysis, Zotero Abstracts). For reporting, outputs include Excel files with optional embedded metadata and a metadata sheet documenting prompt, model, runs, duration, and environment.
-
 
 ## Process flowchart
 
@@ -121,7 +123,9 @@ Key features:
 ```powershell
 python text_analysis.py
 ```
+
 Then follow prompts to:
+
 1. Select model(s)
 2. Provide input file or folder path
 3. Specify output location (optional; defaults to input folder)
@@ -157,16 +161,18 @@ python text_analysis.py --config text_config_example.yaml --no-interactive
 ```powershell
 python text_analysis.py --config text_config_example.yaml
 ```
+
 The script will ask: "Load configuration from text_config_example.yaml? (y/n) [y]:"
 
 ### Input and Output Paths
 
 - **input**: Can be:
-  - A direct file path: `./data/abstracts.xlsx` 
+
+  - A direct file path: `./data/abstracts.xlsx`
   - A folder path: `./data/` (script finds first CSV/XLSX file)
   - Default (interactive): `.` (current directory)
-
 - **output**: Can be:
+
   - A direct file path: `./results.xlsx` (fixed output name)
   - A folder path: `./output_folder/` (auto-generates filename)
   - Not specified (defaults to input folder with auto-generated filename)
@@ -208,7 +214,9 @@ Key features:
 ```powershell
 python image_analysis.py
 ```
+
 Then follow prompts to:
+
 1. Select vision model(s)
 2. Provide input image file or folder path
 3. Specify output location (optional; defaults to input folder)
@@ -250,11 +258,12 @@ python image_analysis.py --config image_config_example.yaml
 ### Input and Output Paths
 
 - **input**: Can be:
+
   - A direct image file path: `./data/building.jpg`
   - A folder path: `./data/images/` (analyzes all images in folder)
   - Default (interactive): prompts for path
-
 - **output**: Can be:
+
   - A direct file path: `./results.xlsx` (fixed output name)
   - A folder path: `./output_folder/` (auto-generates filename)
   - Not specified (defaults to input folder with auto-generated filename)
@@ -315,18 +324,19 @@ Specifying `--within-model-consensus` forces it on; `--no-within-model-consensus
 The tool supports three independent consensus calculations to account for LLM variability:
 
 1. **Within-Model Consensus**: Computed across multiple runs of the same model on the same item
+
    - Applied to `Response_1`, `Response_2`, etc. columns for each model
    - Produces `Consensus (ModelName)` and `Consensus_Confidence (ModelName)` columns
    - Defaults to ON; automatically OFF if only one run per item
    - Modes: `exact` (text must match), `set` (treat responses as unordered lists), `fuzzy` (similarity-based grouping)
-
 2. **Between-Model Consensus**: Computed across per-model consensus results when multiple models are used
+
    - Applied to `Consensus (Model1)`, `Consensus (Model2)`, etc. columns
    - Produces `BetweenModel_Consensus` and `BetweenModel_Consensus_Confidence` columns
    - Only applies if 2+ models are used; defaults to ON
    - Modes: `exact`, `set`, `fuzzy` (configurable independently from within-model)
-
 3. **Aggregated Consensus**: Computed across ALL response columns regardless of model
+
    - Applied directly to all `Response_X (Model)` columns
    - Produces `Aggregated_Consensus` and `Aggregated_Consensus_Confidence` columns
    - Independent from between-model consensus; defaults to OFF
@@ -352,15 +362,17 @@ python image_analysis.py --models "gemma3:12b" --input "./images" --output "resu
 ### Config File Workflow
 
 When using `--config <file>`:
+
 1. In interactive mode, you're prompted to confirm using the config file before proceeding with analysis
 2. In non-interactive mode (`--no-interactive`), the config settings are applied directly
 3. Config values serve as defaults; CLI arguments override them
 4. Missing settings in config fall back to built-in defaults
 
 Config files support both YAML and JSON formats. Example config keys:
+
 - `models`: Array of model names to run sequentially
 - `runs`: Number of times to run each item through each model
-- `within_model_consensus`: Boolean (true/false) 
+- `within_model_consensus`: Boolean (true/false)
 - `within_model_consensus_mode`: One of 'exact', 'set', or 'fuzzy'
 - `within_model_fuzzy_threshold`: Threshold 0-100 for fuzzy matching
 - `between_model_consensus`: Boolean (only applies with 2+ models)
@@ -373,21 +385,27 @@ Config files support both YAML and JSON formats. Example config keys:
 ## Common Workflows
 
 ### Workflow 1: Single File Analysis (Text)
+
 Best for: Quick analysis of one Excel/CSV file
+
 ```powershell
 # Create a minimal config
 python text_analysis.py --config text_config_example.yaml --input "./my_data.xlsx" --output "./my_results.xlsx" --no-interactive
 ```
 
 ### Workflow 2: Batch Processing with Folder
+
 Best for: Running the same analysis on multiple files in a folder
+
 ```powershell
 # First file in folder will be auto-detected and analyzed
 python text_analysis.py --config text_config_example.yaml --no-interactive
 ```
 
 ### Workflow 3: Reproducible Analysis with Config
+
 Best for: Documenting exactly how an analysis was performed
+
 ```powershell
 # 1. Create and version-control your config file in your project
 # 2. Run the analysis
@@ -397,7 +415,9 @@ python text_analysis.py --config ./configs/my_analysis.yaml --no-interactive
 ```
 
 ### Workflow 4: Model Comparison
+
 Best for: Comparing responses across multiple models
+
 ```yaml
 # Create config with multiple models
 models:
@@ -406,12 +426,15 @@ models:
 between_model_consensus: true
 between_model_consensus_mode: "fuzzy"
 ```
+
 ```powershell
 python text_analysis.py --config comparison_config.yaml --no-interactive
 ```
 
 ### Workflow 5: Consensus Evaluation
+
 Best for: Setting multiple consensus modes to compare results
+
 ```yaml
 # Config with within-model fuzzy consensus
 within_model_consensus: true
@@ -422,12 +445,15 @@ within_model_fuzzy_threshold: 85
 aggregate: true
 aggregated_consensus_mode: "exact"
 ```
+
 ```powershell
 python text_analysis.py --config consensus_config.yaml --no-interactive
 ```
 
 ### Workflow 6: Single Image Analysis
+
 Best for: Quick analysis of one image
+
 ```powershell
 python image_analysis.py --input "./photo.jpg" --output "./results.xlsx" --type-of-analysis "architectural features" --runs 3 --no-interactive
 ```
@@ -435,17 +461,11 @@ python image_analysis.py --input "./photo.jpg" --output "./results.xlsx" --type-
 ## Best Practices
 
 1. **Use config files for reproducible analyses**: Config files document exactly what settings were used, making your work reproducible.
-
 2. **Always use `--no-interactive` in scripts**: Use `--no-interactive` when running analyses from scripts or batch jobs to avoid hangs waiting for input.
-
 3. **Test with small runs first**: Before running with `runs: 10+`, test with `runs: 1-2` to verify settings are correct.
-
 4. **Monitor GPU memory**: If analyzing large images or many items, start with fewer runs to avoid GPU memory issues.
-
 5. **Use fuzzy consensus carefully**: Fuzzy matching is flexible but can mask real differences. Always review the confidence scores.
-
 6. **Specify output location explicitly**: Don't rely on defaults; specify `output` in your config to avoid surprises about where results are saved.
-
 7. **Append metadata**: Always use `append_metadata: true` to document analysis conditions for later reference.
 
 ## Requirements
@@ -494,25 +514,27 @@ BibTeX example:
 ## Getting Started
 
 1. **Clone the repository**
-   ```powershell
-   git clone https://github.com/hleve/AI_Assisted_Analysis_Tool.git
-   ```
 
+   ```powershell
+   git clone https://github.com/henrylevesque/AI_Assisted_Analysis_Tool.git
+   ```
 2. **Install dependencies**
+
    ```powershell
    pip install -r requirements.txt
    ```
-
 3. **Run the main script**
+
    ```powershell
    python text_analysis.py
    ```
-
 4. **Explore analysis modules**
+
    - `other_analysis/ai_response_aggregation.py`: Aggregates AI responses
    - `python_for_Zotero_abstracts/`: Contains thematic and methodological analysis scripts
 
 Optional: if you use Ollama models locally, pull the default model:
+
 ```bash
 ollama pull gemma2
 ```
